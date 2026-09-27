@@ -1,0 +1,53 @@
+# Build G7 Bridge
+
+## Tools
+
+Use Windows x64 with PowerShell **7**, the **.NET 10 SDK**, Visual Studio C++ Build Tools (MSVC x64), and Windows SDK **10.0.26100.0 or later**, including C++/WinRT. `BuildNative.ps1` locates the compiler with `vswhere.exe`. To create setup, use [Inno Setup 6.7.3](https://jrsoftware.org/isdl.php).
+
+Pinned driver installers, notices and the replaceable libusb DLL/source are in `vendor/`. `Restore-Vendor.ps1` restores the large HIDMaestro library from its official release with archive and DLL hash checks. `G7Bridge.Native.dll` is built from source and ignored by Git. NuGet restores the managed dependencies. No Nexus installation, controller, Steam session or administrator access is needed to build.
+
+## Compile and run offline unit tests
+
+```powershell
+./Build.ps1 -RunUnitTests
+```
+
+Output: `artifacts/package/`. This runs the protocol unit suite and two native suites using in-memory providers, then builds a self-contained Windows app. It does not access controller hardware, install drivers, change services or start the app.
+
+Core tests alone:
+
+```powershell
+dotnet run --project tests/G7Bridge.Tests.csproj -c Release
+```
+
+## Produce the single-file installer
+
+```powershell
+./Build-Installer.ps1 -RunUnitTests
+```
+
+If the compiler is outside the usual locations:
+
+```powershell
+./Build-Installer.ps1 -CompilerPath 'C:\Tools\InnoSetup\ISCC.exe' -RunUnitTests
+```
+
+Output: `artifacts/installer/G7Bridge-<version>-Setup-x64.exe` and `SHA256SUMS.txt`. This compiles setup; it never runs it. `-SkipBuild` can reuse an already completed package. The archive is self-contained; driver installation itself occurs only when a person runs setup and accepts elevation.
+
+The installer follows the Windows **UI language** through Inno Setup's `uilanguage` detection, with English first and Dutch second. The app uses `CultureInfo.CurrentUICulture`, normalized to English or Dutch. Technical service logs are English. The service exposes stable attention codes, so UI messages do not depend on parsing translated diagnostic text.
+
+## Installer lifecycle
+
+- Inno Setup owns the fixed Program Files directory, Start menu / optional desktop shortcuts and Windows uninstall registration.
+- `--prepare-setup` validates the exact existing service command, stops only that service and recovers its own hiding journal. The new helper is extracted to setup's temporary directory before old binaries are replaced.
+- `--configure-service` installs required drivers, preserves settings, registers a demand-start LocalSystem service and grants local users query/start/stop access. Exit `3010` requests a Windows restart.
+- `--uninstall-service` stops/removes the own service and restores its hiding rules before Inno removes the binaries. Shared drivers and ProgramData settings are retained.
+- Unknown command-line options are rejected. Historical manual research windows are excluded from compilation; the shipped app always uses the service UI.
+
+The installer refuses an unrelated service that happens to use the same service name. It does not disable Developer Mode/security, flash firmware or remove other applications' virtual controllers.
+
+## Release workflow
+
+The GitHub build workflow compiles and unit-tests the Windows app and setup. Installer execution and real controller behavior require separate, explicitly authorized manual acceptance. Feature changes go through a branch and draft pull request. Publish a prerelease until the installer has received manual acceptance and the required independent review; build success alone is not that acceptance.
+
+Source code is MIT licensed. Keep all third-party notices and corresponding libusb source when distributing the app. See [DEPENDENCIES.md](../DEPENDENCIES.md).
