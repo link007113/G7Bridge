@@ -14,7 +14,7 @@ The 1.1 release build passed 47 core tests, 15 native API tests and 21 native co
 
 This release changes distribution, setup lifecycle, language selection and presentation. It retains the controller packet formats and forwarding algorithms. Core tests cover English fallback, Dutch display-language selection and exact service-command ownership. Native suites use in-memory providers.
 
-The new installer, clean install, upgrade, uninstall, driver-reboot flow and over-the-shoulder administrator credentials have **not been executed for acceptance**. No new controller test was performed for this packaging release. Treat `1.1.0-rc.1` as a preview until these have been assessed manually.
+The new installer, clean install, upgrade, uninstall, driver-reboot flow and over-the-shoulder administrator credentials have **not been executed for acceptance**. No new controller test was performed for this packaging release. Treat `1.1.0-rc.2` as a preview until these have been assessed manually.
 
 ## Manual acceptance checklist
 

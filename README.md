@@ -4,7 +4,7 @@
 
 **[Download the Windows installer](https://github.com/link007113/G7Bridge/releases)** · [Nederlandse handleiding](docs/README.nl.md) · [Report a problem](https://github.com/link007113/G7Bridge/issues)
 
-The first installer release is **1.1.0-rc.1 (preview)**. The underlying controller bridge has been exercised on a real G7 Pro. This new installer, upgrade and uninstall flow still needs manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
+The current installer release is **1.1.0-rc.2 (preview)**. The underlying controller bridge has been exercised on a real G7 Pro. This new installer, upgrade and uninstall flow still needs manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
 
 ## Requirements
 
@@ -15,8 +15,8 @@ The first installer release is **1.1.0-rc.1 (preview)**. The underlying controll
 
 ## Install and play
 
-1. Download **`G7Bridge-1.1.0-rc.1-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
-2. Exit an older G7 Bridge instance, run the installer and accept the Windows elevation prompt. The installer includes the app, its .NET runtime and required controller drivers. USB devices may briefly reconnect during the first driver installation. Restart Windows if setup asks.
+1. Download **`G7Bridge-1.1.0-rc.2-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
+2. Exit an older G7 Bridge instance, run the installer and accept the Windows elevation prompt and the bundled Microsoft GameInput terms. The installer includes the app, its .NET runtime and required controller drivers. USB devices may briefly reconnect during the first driver installation. Restart Windows if setup asks.
 3. Close GameSir Nexus, connect the 2.4 GHz receiver and turn on the controller.
 4. Open **G7 Bridge** from the Start menu or desktop shortcut. Once ready, the window moves to the system tray.
 5. In **Steam → Settings → Controller**, look for **Steam Controller**. Enable Steam Input for your game, then bind the extra buttons and choose the gyro behavior in that game's controller layout.
@@ -83,4 +83,4 @@ Use **Save diagnostics** in the app when reporting a problem. Diagnostics contai
 
 See **[BUILD.md](docs/BUILD.md)** for the compiler prerequisites, offline unit tests and installer build. The public app consists of a .NET protocol core, a native C++/WinRT input adapter and a small Windows service/tray UI. Dependencies and their licenses are listed in **[DEPENDENCIES.md](DEPENDENCIES.md)**. Historical research windows remain in source but are excluded from the distributed app.
 
-G7 Bridge source is MIT licensed; bundled third-party components keep their own licenses. This is an independent community project, not affiliated with or endorsed by GameSir, Valve, Microsoft or Nefarius.
+G7 Bridge source is MIT licensed; bundled third-party components keep their own licenses. The [redistribution notice](NOTICE.md) applies to the included components in source archives and installer packages. This is an independent community project, not affiliated with or endorsed by GameSir, Valve, Microsoft or Nefarius.

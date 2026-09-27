@@ -1,6 +1,6 @@
 # Dependencies and provenance
 
-G7 Bridge source is MIT licensed. Third-party components retain the licenses listed below; the complete notices are in `vendor/licenses/` in the repository and `licenses/` in the installed package.
+G7 Bridge source is MIT licensed. Third-party components retain the licenses listed below; the complete notices are in `vendor/licenses/` in the repository and `licenses/` in the installed package. The [redistribution notice](NOTICE.md) applies to bundled components in both repository/source archives and installer packages. Setup presents the unmodified Microsoft GameInput terms for acceptance.
 
 | Component | Version | Origin / license |
 | --- | --- | --- |

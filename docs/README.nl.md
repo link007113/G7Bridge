@@ -6,8 +6,8 @@ Gebruik je **GameSir G7 Pro via de 2,4GHz-ontvanger** als virtuele Steam Control
 
 ## Installeren
 
-1. Download **`G7Bridge-1.1.0-rc.1-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
-2. Sluit een eventueel geopende G7 Bridge en voer de installer uit. Bevestig de Windows-beheerdersvraag. De app, .NET-runtime, dienst en benodigde drivers zitten in dit bestand. USB-apparaten kunnen bij de eerste driverinstallatie kort opnieuw verbinden. Herstart Windows als de installer daarom vraagt.
+1. Download **`G7Bridge-1.1.0-rc.2-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
+2. Sluit een eventueel geopende G7 Bridge en voer de installer uit. Bevestig de Windows-beheerdersvraag en lees en accepteer de voorwaarden van het meegeleverde Microsoft GameInput-onderdeel. De app, .NET-runtime, dienst en benodigde drivers zitten in dit bestand. USB-apparaten kunnen bij de eerste driverinstallatie kort opnieuw verbinden. Herstart Windows als de installer daarom vraagt.
 3. Sluit GameSir Nexus, steek de 2,4GHz-ontvanger in en zet de controller aan.
 4. Open **G7 Bridge** via Start of de bureaubladsnelkoppeling. Zodra de verbinding gereed is, gaat het venster naar het systeemvak.
 5. Kijk in **Steam → Instellingen → Controller** naar **Steam Controller**. Zet Steam Input aan voor je spel en wijs de extra knoppen en gyro daar toe.
@@ -57,6 +57,8 @@ Kies **Diagnose opslaan** bij een foutmelding. De export bevat onder meer appara
 
 ## Status van deze release
 
-**1.1.0-rc.1 is een preview.** De bestaande bridge is met een echte G7 Pro gemeten. De nieuwe installer, upgrade- en verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Er zijn offline unittests en builds uitgevoerd; dat vervangt die installatieproef niet. Zie [de precieze validatiestatus](VALIDATION.md).
+**1.1.0-rc.2 is een preview.** De bestaande bridge is met een echte G7 Pro gemeten. De nieuwe installer, upgrade- en verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Er zijn offline unittests en builds uitgevoerd; dat vervangt die installatieproef niet. Zie [de precieze validatiestatus](VALIDATION.md).
 
 [Broncode bouwen](BUILD.md) · [Onderdelen en licenties](../DEPENDENCIES.md)
+
+De oorspronkelijke Microsoft-voorwaarden blijven in het Engels beschikbaar. Bij gebruik of herdistributie van de meegeleverde onderdelen gelden hun eigen voorwaarden; zie [NOTICE.md](../NOTICE.md).

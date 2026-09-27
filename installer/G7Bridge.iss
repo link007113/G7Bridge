@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.1.0-rc.1"
+  #define AppVersion "1.1.0-rc.2"
 #endif
 #ifndef PackageDir
   #define PackageDir "..\artifacts\package"
@@ -13,6 +13,7 @@ AppPublisher=G7 Bridge contributors
 AppPublisherURL=https://github.com/link007113/G7Bridge
 AppSupportURL=https://github.com/link007113/G7Bridge/issues
 AppUpdatesURL=https://github.com/link007113/G7Bridge/releases
+LicenseFile=..\vendor\licenses\GameInput-LICENSE.txt
 DefaultDirName={autopf}\Grimm\G7Bridge
 UsePreviousAppDir=no
 DisableDirPage=yes

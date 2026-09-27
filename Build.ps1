@@ -17,7 +17,7 @@ try {
     if (Test-Path -LiteralPath $packagePath) { Remove-Item -LiteralPath $packagePath -Recurse -Force }
     dotnet publish src/G7Bridge.Windows/G7Bridge.Windows.csproj -c Release -r win-x64 --self-contained true -o $outputDirectory
     if ($LASTEXITCODE -ne 0) { throw 'Publiceren mislukt.' }
-    Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md'),(Join-Path $projectRoot 'DEPENDENCIES.md'),(Join-Path $projectRoot 'LICENSE') -Destination $outputDirectory
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md'),(Join-Path $projectRoot 'DEPENDENCIES.md'),(Join-Path $projectRoot 'LICENSE'),(Join-Path $projectRoot 'NOTICE.md') -Destination $outputDirectory
     Copy-Item -LiteralPath (Join-Path $projectRoot 'docs') -Destination $outputDirectory -Recurse -Force
     foreach ($directory in @('drivers','licenses','sources')) {
         Copy-Item -LiteralPath (Join-Path $projectRoot ('vendor\' + $directory)) -Destination $outputDirectory -Recurse -Force
