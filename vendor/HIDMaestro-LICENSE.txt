@@ -1,9 +1,12 @@
 MIT License
 
-This license applies to G7 Bridge's own code. Bundled third-party components
-retain their separate terms; see NOTICE.md and DEPENDENCIES.md.
+"And we talk of Christ, we rejoice in Christ, we preach of Christ, we prophesy of Christ,
+and we write according to our prophecies, that our children may know to what source they
+may look for a remission of their sins." — 2 Nephi 25:26
 
-Copyright (c) 2026 link007113
+Glory, honor, and praise to the Lord Jesus Christ, the source of all truth and salvation, forever and ever.
+
+Copyright (c) 2026 HIDMaestro Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

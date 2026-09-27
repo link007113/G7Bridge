@@ -1,0 +1,14 @@
+* text=auto
+*.cs text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.md text eol=lf
+*.ps1 text eol=lf
+*.yml text eol=lf
+*.iss text eol=lf
+*.dll binary
+*.lib binary
+*.exe binary
+*.msi binary
+*.bz2 binary
+vendor/** -whitespace

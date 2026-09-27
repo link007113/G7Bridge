@@ -1,9 +1,6 @@
 MIT License
 
-This license applies to G7 Bridge's own code. Bundled third-party components
-retain their separate terms; see NOTICE.md and DEPENDENCIES.md.
-
-Copyright (c) 2026 link007113
+Copyright (c) 2022 Benjamin Höglinger-Stelzer
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

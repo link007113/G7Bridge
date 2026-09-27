@@ -1,0 +1,32 @@
+name: Build Windows installer
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build and run offline unit tests
+        run: ./Build.ps1 -RunUnitTests
+      - name: Compile installer without running it
+        run: |
+          $compiler = ./tools/Get-InnoCompiler.ps1
+          ./Build-Installer.ps1 -SkipBuild -CompilerPath $compiler
+      - uses: actions/upload-artifact@v4
+        with:
+          name: G7Bridge-Windows-x64-installer
+          path: artifacts/installer/*
+          if-no-files-found: error
