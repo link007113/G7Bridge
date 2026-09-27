@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+artifacts/
+*.user
+EXECPLAN.md
+NEXUS-OPNAME.md
+START-HIER.txt
+vendor/G7Bridge.Native.dll
+*.pcap
+*.pcapng
+*.dmp
+*.log
+.vs/
