@@ -2,6 +2,45 @@ using G7Bridge.Core;
 using System.Buffers.Binary;
 
 var tests = new (string Name, Action Body)[] {
+    ("Captured partial LT uses its physical position instead of the saturated processed field",()=>{
+        var report=Convert.FromHexString("1000003CE0808080800F0400FF000000001500FCFFF3FF5FEF0D0DECE1000000006100007F7F007F7F007F7F007F7F00000000858084850F0400006B00000000");
+        Equal((byte)255,report[12]);Equal((byte)107,report[59]);
+        True(G7Protocol.TryTelemetry(report,out var telemetry));
+        Equal((ushort)(107*257),telemetry!.LowResolutionPad.LT);Equal((ushort)0,telemetry.LowResolutionPad.RT);
+    }),
+    ("Fresh physical triggers override later clipped Windows samples while preserving high-resolution sticks",()=>{
+        var state=new InputState();var report=TelemetryFrame();report[12]=report[13]=255;report[59]=107;report[60]=64;
+        state.Accept(report,1000);
+        state.Accept(GameInputPackets.Gamepad(0,1,1,0.75f,-0.25f,-0.5f,0.5f),1008);
+        var snapshot=state.Snapshot(1010,new());
+        Equal((ushort)(107*257),snapshot.Pad.LT);Equal((ushort)(64*257),snapshot.Pad.RT);
+        Equal((short)24575,snapshot.Pad.LX);Equal((short)-8192,snapshot.Pad.LY);True(snapshot.HasGamepad);
+        var output=TritonProtocol.Encode(snapshot.Pad,snapshot.Motion,0,0);
+        var monitor=new VirtualInputMonitor();True(monitor.Accept(output,1010));
+        var received=monitor.Snapshot(1011).Pad;True(Math.Abs(VirtualPadState.Trigger(received.LT)-107/255f)<0.0001);
+    }),
+    ("All 256 physical trigger positions reach virtual output monotonically and independently",()=>{
+        int previous=-1;
+        for(int position=0;position<=255;position++) {
+            var state=new InputState();var raw=TelemetryFrame();raw[12]=raw[13]=255;raw[59]=(byte)position;raw[60]=(byte)(255-position);
+            state.Accept(GameInputPackets.Gamepad(0,1,1,0,0,0,0),0);state.Accept(raw,1);
+            var input=state.Snapshot(2,new());var report=TritonProtocol.Encode(input.Pad,input.Motion,0,0);
+            int left=BinaryPrimitives.ReadUInt16LittleEndian(report.AsSpan(6)),right=BinaryPrimitives.ReadUInt16LittleEndian(report.AsSpan(8));
+            Equal(position*32767/255,left);Equal((255-position)*32767/255,right);True(left>previous);previous=left;
+        }
+    }),
+    ("Stale physical trigger telemetry releases triggers rather than restoring clipped Windows values",()=>{
+        var state=new InputState();var raw=TelemetryFrame();raw[59]=128;raw[60]=255;
+        state.Accept(raw,1000);state.Accept(GameInputPackets.Gamepad(0,1,1,0.5f,0,0,0),1151);
+        var lost=state.Snapshot(1151,new());True(lost.HasGamepad);True(!lost.HasTelemetry);
+        Equal((ushort)0,lost.Pad.LT);Equal((ushort)0,lost.Pad.RT);Equal((short)16384,lost.Pad.LX);
+        raw[59]=32;raw[60]=0;state.Accept(raw,1160);
+        Equal((ushort)(32*257),state.Snapshot(1160,new()).Pad.LT);
+    }),
+    ("Ordinary gamepad triggers still work before any vendor telemetry has arrived",()=>{
+        var state=new InputState();state.Accept(GameInputPackets.Gamepad(0,0.5f,0.25f,0,0,0,0),0);
+        var pad=state.Snapshot(1,new()).Pad;True(pad.LT>32000 && pad.LT<33000);True(pad.RT>16000 && pad.RT<17000);
+    }),
     ("Monitor targets only the bridge serial, never a physical or unrelated Steam Controller",()=>{
         Equal("HM5AB6FC945E5A",VirtualControllerIdentity.UsbSerial);
         True(VirtualControllerIdentity.Matches(0x28DE,0x1302,0xFF00,54,"HM5AB6FC945E5A"));

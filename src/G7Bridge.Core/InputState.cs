@@ -20,6 +20,13 @@ public sealed class InputState
         bool motionFresh=telemetry is not null && milliseconds>=telemetryTime && milliseconds-telemetryTime<=150;
         bool padFresh=gamepad is not null && milliseconds>=gamepadTime && milliseconds-gamepadTime<=150;
         var pad=padFresh ? gamepad!.Value : motionFresh ? telemetry!.LowResolutionPad : default;
+        // Keep Windows/GIP stick precision, but use physical trigger travel once
+        // vendor telemetry is available. Never jump back to clipped profile values
+        // during a telemetry gap; release these axes until their source recovers.
+        if(telemetry is not null)pad=pad with {
+            LT=motionFresh?telemetry.LowResolutionPad.LT:(ushort)0,
+            RT=motionFresh?telemetry.LowResolutionPad.RT:(ushort)0
+        };
         MotionState motion=default;
         if(motionFresh) {
             var buttons=telemetry!.LowResolutionPad.Buttons;

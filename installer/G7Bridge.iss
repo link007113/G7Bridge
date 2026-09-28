@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.2.0-rc.1"
+  #define AppVersion "1.2.0-rc.2"
 #endif
 #ifndef PackageDir
   #define PackageDir "..\artifacts\package"

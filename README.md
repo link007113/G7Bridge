@@ -4,7 +4,7 @@
 
 **[Download the Windows installer](https://github.com/link007113/G7Bridge/releases)** · [Nederlandse handleiding](docs/README.nl.md) · [Report a problem](https://github.com/link007113/G7Bridge/issues)
 
-The current installer release is **1.2.0-rc.1 (preview)**. The underlying controller bridge has been exercised on a real G7 Pro. This new installer, upgrade and uninstall flow still needs manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
+The current installer release is **1.2.0-rc.2 (preview)**. The underlying controller bridge has been exercised on a real G7 Pro. This new installer, upgrade and uninstall flow still needs manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ The current installer release is **1.2.0-rc.1 (preview)**. The underlying contro
 
 ## Install and play
 
-1. Download **`G7Bridge-1.2.0-rc.1-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
+1. Download **`G7Bridge-1.2.0-rc.2-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
 2. Exit an older G7 Bridge instance, run the installer and accept the Windows elevation prompt and the bundled Microsoft GameInput terms. The installer includes the app, its .NET runtime and required controller drivers. USB devices may briefly reconnect during the first driver installation. Restart Windows if setup asks.
 3. Close GameSir Nexus, connect the 2.4 GHz receiver and turn on the controller.
 4. Open **G7 Bridge** from the Start menu or desktop shortcut. Once ready, the window moves to the system tray.
@@ -29,7 +29,8 @@ The setup executable is currently **unsigned**, so Windows may show an unknown-p
 
 | G7 Pro input / feature | Bridge behavior |
 | --- | --- |
-| Sticks, triggers, D-pad and normal buttons | Forwarded to the virtual controller; sticks and triggers use the Windows/GIP values |
+| Sticks, D-pad and normal buttons | Forwarded to the virtual controller; sticks retain the Windows/GIP values |
+| Analogue triggers | Physical GameSir telemetry positions, with 256 steps; avoids already clipped/profile-processed trigger values |
 | L4, R4, L5 and R5 | Four independent grip buttons, assignable in Steam Input |
 | Share / screenshot | An independent Quick Access input; assign the screenshot action in Steam Input |
 | Gyroscope and accelerometer | Motion data forwarded to Steam Input, with relative orientation |
@@ -41,6 +42,8 @@ The setup executable is currently **unsigned**, so Windows may show an unknown-p
 | Hardware pairing, profile and configuration controls | Remain controller functions |
 
 Extra buttons and motion require appropriate Steam Input bindings. A game that only accepts XInput will receive the actions configured by Steam; installing the bridge does not add native gyro support to that game's own input API. Existing firmware button remaps do not duplicate the independent extra button input in the virtual controller.
+
+The bridge uses the physical analogue trigger positions before firmware profile processing. Onboard trigger curves/hair-trigger processing are therefore not applied to the virtual trigger values; configure game-specific behavior in Steam Input. This does not rewrite your controller profile. If previously received physical telemetry goes stale, the triggers are released until fresh data returns.
 
 ## Daily use
 
