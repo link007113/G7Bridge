@@ -11,8 +11,10 @@ public static class G7Protocol
     {
         value=null;
         if(report.Length != 64 || report[0]!=0x10 || report[3]!=60 || report[4]!=0xE0) return false;
+        // 12/13 are processed trigger values and may already be digital/clipped.
+        // 59/60 contain the physical analogue positions, alongside physical buttons.
         var pad=new PadState(Axis(report[5]),Invert(Axis(report[6])),Axis(report[7]),Invert(Axis(report[8])),
-            (ushort)(report[12]*257),(ushort)(report[13]*257),PhysicalButtons(report),false);
+            (ushort)(report[59]*257),(ushort)(report[60]*257),PhysicalButtons(report),false);
         value=new Telemetry(S16(report,17),S16(report,19),S16(report,21),S16(report,23),S16(report,25),S16(report,27),
             report[33]<=100 ? report[33] : null,report[32]==1,pad,report.ToArray());
         return true;

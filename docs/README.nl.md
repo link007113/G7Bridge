@@ -6,7 +6,7 @@ Gebruik je **GameSir G7 Pro via de 2,4GHz-ontvanger** als virtuele Steam Control
 
 ## Installeren
 
-1. Download **`G7Bridge-1.2.0-rc.1-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
+1. Download **`G7Bridge-1.2.0-rc.2-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
 2. Sluit een eventueel geopende G7 Bridge en voer de installer uit. Bevestig de Windows-beheerdersvraag en lees en accepteer de voorwaarden van het meegeleverde Microsoft GameInput-onderdeel. De app, .NET-runtime, dienst en benodigde drivers zitten in dit bestand. USB-apparaten kunnen bij de eerste driverinstallatie kort opnieuw verbinden. Herstart Windows als de installer daarom vraagt.
 3. Sluit GameSir Nexus, steek de 2,4GHz-ontvanger in en zet de controller aan.
 4. Open **G7 Bridge** via Start of de bureaubladsnelkoppeling. Zodra de verbinding gereed is, gaat het venster naar het systeemvak.
@@ -20,7 +20,7 @@ De eigen installer heeft nog geen codeondertekening. Windows kan daarom een meld
 
 ## Functies
 
-- Gewone knoppen, sticks en triggers worden doorgegeven. Sticks en triggers gebruiken de Windows/GIP-waarden.
+- Gewone knoppen, sticks en triggers worden doorgegeven. Sticks behouden de Windows/GIP-resolutie; triggers gebruiken de fysieke analoge GameSir-stand met 256 stappen.
 - **L4, R4, L5 en R5** zijn vier onafhankelijke gripknoppen in Steam Input.
 - **Share** wordt een aparte Quick Access-invoer. Koppel daar in Steam Input de screenshotactie aan.
 - **Gyro, accelerometer, relatieve oriëntatie en accupercentage** worden doorgegeven.
@@ -28,6 +28,8 @@ De eigen installer heeft nog geen codeondertekening. Windows kan daarom een meld
 - De G7 heeft geen trackpads. De virtuele touchoppervlakken blijven onaangeraakt. Hardwareknoppen voor koppelen, profielen en instellingen blijven controllerfuncties.
 
 Een XInput-spel krijgt de acties die je in Steam Input instelt. De bridge voegt geen nieuwe gyro-API aan het spel zelf toe. Bestaande firmware-remapping hoort geen dubbele A/B-actie van een achterknop te veroorzaken.
+
+De analoge triggerstand wordt vóór de verwerking van het controllerprofiel gelezen. Een daarin ingestelde curve of hair-triggerbewerking wordt dus niet toegepast op de virtuele triggerwaarden. Spelspecifiek gedrag kun je in Steam Input instellen; de bridge herschrijft je controllerprofiel niet. Verouderde fysieke telemetrie laat de triggers los totdat verse invoer terugkomt.
 
 ## Dagelijks gebruik
 
@@ -63,7 +65,7 @@ Kies **Diagnose opslaan** bij een foutmelding. De export bevat onder meer appara
 
 ## Status van deze release
 
-**1.2.0-rc.1 is een preview.** De bestaande bridge is met een echte G7 Pro gemeten. De nieuwe installer, upgrade- en verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Er zijn offline unittests en builds uitgevoerd; dat vervangt die installatieproef niet. Zie [de precieze validatiestatus](VALIDATION.md).
+**1.2.0-rc.2 is een preview.** De bestaande bridge is met een echte G7 Pro gemeten. De nieuwe installer, upgrade- en verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Er zijn offline unittests en builds uitgevoerd; dat vervangt die installatieproef niet. Zie [de precieze validatiestatus](VALIDATION.md).
 
 [Broncode bouwen](BUILD.md) · [Onderdelen en licenties](../DEPENDENCIES.md)
 

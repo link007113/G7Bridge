@@ -20,9 +20,11 @@ The authorized in-place upgrade from 1.0 to 1.1.0-rc.2 completed on the developm
 
 The GUI reads the owned virtual Steam Controller's HID input back from Windows and displays its buttons, sticks, triggers and three gyro rates. Device selection requires the existing bridge identity; the protocol and physical-input route are unchanged. The manual rumble button sends a bounded 400 ms pulse at one-quarter strength to the two main motors through the existing virtual-controller feedback route. Hiding/closing cancels the pulse and an explicit neutral command is attempted on completion, cancellation and failure.
 
-Offline tests cover the report decoder, stale input, signed gyro data, identity scope, rumble formatting, and neutral commands on success/cancellation/failure. English and Dutch layouts are rendered with explicitly labelled sample input. No physical rumble test or live viewer acceptance has been performed by the development assistant for this feature. Treat `1.2.0-rc.1` as a preview pending the user's own controller checks.
+Offline tests cover the report decoder, stale input, signed gyro data, identity scope, rumble formatting, and neutral commands on success/cancellation/failure. English and Dutch layouts are rendered with explicitly labelled sample input. No physical rumble test or live viewer acceptance has been performed by the development assistant for this feature. Treat `1.2.0-rc.2` as a preview pending the user's own controller checks.
 
 ## Manual acceptance checklist
+
+The rc.2 trigger correction uses a user-operated partial-LT observation: physical byte 59 was 107/255 while processed byte 12, Windows input and virtual output were already at their maximum. Offline regressions reproduce that mismatch and cover all 256 physical positions for both triggers, stick preservation and stale-data release. No firmware setting was changed and the assistant did not actuate the triggers. Micro-switch-mode behavior has not been newly validated in this correction.
 
 On a suitable test machine, with permission to install the components:
 

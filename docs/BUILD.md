@@ -38,6 +38,8 @@ The installer follows the Windows **UI language** through Inno Setup's `uilangua
 
 The live diagram uses a separate, normal-user HID reader. `VirtualControllerIdentity` derives the unchanged USB serial from the pinned HIDMaestro 1.9 identity key. Both enumeration and each opened handle check VID/PID, the vendor usage page, report size and that exact serial. No physical GameSir channel is opened by this viewer. Rumble testing writes the documented Triton 0x80 report, padded to the Windows HID output size, and follows the same existing feedback route as game rumble. There is no new privileged IPC channel. Unit tests cover decoding, freshness, identity scope and stop-on-cancel/failure behavior without HID access.
 
+Trigger sourcing: GameSir E0 report bytes 59/60 provide the physical 8-bit LT/RT positions. Bytes 12/13 and the Windows/GIP state can already contain clipped/profile-processed values. Once vendor telemetry has arrived, `InputState` uses its fresh physical triggers alongside the higher-resolution Windows/GIP sticks. It releases triggers during telemetry gaps rather than jumping back to the processed values. An ordinary gamepad-only session keeps its existing trigger path. The captured regression payload and full 256-step sweep cover this boundary.
+
 ## Installer lifecycle
 
 - Inno Setup owns the fixed Program Files directory, Start menu / optional desktop shortcuts and Windows uninstall registration.
