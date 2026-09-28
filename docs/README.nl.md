@@ -6,7 +6,7 @@ Gebruik je **GameSir G7 Pro via de 2,4GHz-ontvanger** als virtuele Steam Control
 
 ## Installeren
 
-1. Download **`G7Bridge-1.1.0-rc.2-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
+1. Download **`G7Bridge-1.2.0-rc.1-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
 2. Sluit een eventueel geopende G7 Bridge en voer de installer uit. Bevestig de Windows-beheerdersvraag en lees en accepteer de voorwaarden van het meegeleverde Microsoft GameInput-onderdeel. De app, .NET-runtime, dienst en benodigde drivers zitten in dit bestand. USB-apparaten kunnen bij de eerste driverinstallatie kort opnieuw verbinden. Herstart Windows als de installer daarom vraagt.
 3. Sluit GameSir Nexus, steek de 2,4GHz-ontvanger in en zet de controller aan.
 4. Open **G7 Bridge** via Start of de bureaubladsnelkoppeling. Zodra de verbinding gereed is, gaat het venster naar het systeemvak.
@@ -30,6 +30,12 @@ De eigen installer heeft nog geen codeondertekening. Windows kan daarom een meld
 Een XInput-spel krijgt de acties die je in Steam Input instelt. De bridge voegt geen nieuwe gyro-API aan het spel zelf toe. Bestaande firmware-remapping hoort geen dubbele A/B-actie van een achterknop te veroorzaken.
 
 ## Dagelijks gebruik
+
+Het venster toont een **live controllertekening**. Knoppen lichten op, stickmarkeringen bewegen en triggers tonen hun percentage. Ook L4/R4/L5/R5, Guide en Share staan erop. Drie gyrobalkjes tonen de draaisnelheid in graden per seconde. De tekst bij de laatste knop bewaart ook een korte druk.
+
+De weergave leest de eigen **virtuele Steam Controller via Windows terug**. Zo zie je welke invoer Windows ontvangt. De spelacties hangen vervolgens af van je Steam Input-indeling. Bij verouderde of weggevallen invoer wordt de weergave neutraal. Het uitlezen stopt als het venster verborgen is.
+
+Met **Triltest (0,4 s)** laat je beide hoofdmotoren kort en op gematigde sterkte trillen. De aanvraag loopt via de virtuele controller terug door de bridge. De knop werkt alleen bij verse virtuele invoer en een actieve bridge. Minimaliseren of afsluiten annuleert de test; aan het einde wordt een stopbericht gestuurd. De test start nooit vanzelf en stuurt de triggermotoren niet aan.
 
 **Minimaliseren** laat de bridge actief. Dubbelklik op het systeemvakicoon of open de snelkoppeling opnieuw om het venster terug te halen. **Uitzetten** stopt de bridge; **Afsluiten** sluit ook de app. Daarbij wordt de fysieke controller weer vrijgegeven.
 
@@ -57,7 +63,7 @@ Kies **Diagnose opslaan** bij een foutmelding. De export bevat onder meer appara
 
 ## Status van deze release
 
-**1.1.0-rc.2 is een preview.** De bestaande bridge is met een echte G7 Pro gemeten. De nieuwe installer, upgrade- en verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Er zijn offline unittests en builds uitgevoerd; dat vervangt die installatieproef niet. Zie [de precieze validatiestatus](VALIDATION.md).
+**1.2.0-rc.1 is een preview.** De bestaande bridge is met een echte G7 Pro gemeten. De nieuwe installer, upgrade- en verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Er zijn offline unittests en builds uitgevoerd; dat vervangt die installatieproef niet. Zie [de precieze validatiestatus](VALIDATION.md).
 
 [Broncode bouwen](BUILD.md) · [Onderdelen en licenties](../DEPENDENCIES.md)
 
