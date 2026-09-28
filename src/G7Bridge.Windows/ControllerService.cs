@@ -152,9 +152,11 @@ internal sealed class ControllerService : ServiceBase
                         ServiceFiles.Publish(state);await Task.Delay(500,stop);continue;
                     }
                     bool hidingApplies=ReceiverPresence.IsSessionRoot(receivers[0].InstanceId);
+                    // GameInput may still be starting right after sign-in, so an enumeration
+                    // error gets the same grace period as a controller it does not report yet.
                     ControllerDevice[] devices;
                     try {devices=GameInputTransport.Enumerate().Where(d=>d.ProductId is 0x100A or 0x106B && d.PhysicalKey==receivers[0].Location).ToArray();}
-                    catch(Exception) {Ended(gate.SessionEnded(false,hidingApplies));throw;}
+                    catch(Exception) {Ended(gate.NotReported(Environment.TickCount64,hidingApplies));throw;}
                     if(devices.Length!=1) {
                         Ended(gate.NotReported(Environment.TickCount64,hidingApplies));
                         state.Phase="Waiting for Windows to report the GameSir G7 Pro";

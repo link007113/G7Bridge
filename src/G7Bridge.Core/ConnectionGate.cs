@@ -25,14 +25,16 @@ public sealed class ConnectionGate
     {
         graceStart??=now;
         if(now-graceStart<ReportGraceMilliseconds)return GateAction.Wait;
+        var result=SessionEnded(false,hidingApplies);
         graceStart=now;
-        return SessionEnded(false,hidingApplies);
+        return result;
     }
     // Repeated failures with the controller present give the physical controller
     // back until it disconnects. Hiding has no effect on the 100A identity, so
     // failures there only lead to another attempt.
     public GateAction SessionEnded(bool receivedTelemetry,bool hidingApplies=true)
     {
+        graceStart=null; // silence after any attempt gets its own grace period from the next pass
         if(receivedTelemetry){failures=0;return GateAction.Wait;}
         if(!hidingApplies)return GateAction.Wait;
         if(++failures<MaximumFailures)return GateAction.Wait;

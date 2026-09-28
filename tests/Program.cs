@@ -43,6 +43,14 @@ var tests = new (string Name, Action Body)[] {
         Equal(GateAction.Start,gate.Next(true,61_000));Equal(GateAction.Wait,gate.SessionEnded(false));
         Equal(GateAction.Start,gate.Next(true,62_000));Equal(GateAction.Release,gate.SessionEnded(false));
     }),
+    ("The report grace period restarts after every session",()=>{
+        var gate=new ConnectionGate();
+        Equal(GateAction.Start,gate.Next(true,0));Equal(GateAction.Wait,gate.SessionEnded(true));
+        // Silence right after the session is still within its own grace period, so release needs the full 3 x 10 s.
+        Equal(GateAction.Start,gate.Next(true,100_000));Equal(GateAction.Wait,gate.NotReported(105_000,true));
+        Equal(GateAction.Wait,gate.NotReported(115_000,true));Equal(GateAction.Wait,gate.NotReported(125_000,true));
+        Equal(GateAction.Release,gate.NotReported(135_000,true));
+    }),
     ("Failures on the 100A identity never release hiding because it does not apply there",()=>{
         var gate=new ConnectionGate();
         for(int i=0;i<6;i++){Equal(GateAction.Start,gate.Next(true,i*60_000L));Equal(GateAction.Wait,gate.SessionEnded(false,hidingApplies:false));}
