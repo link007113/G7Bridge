@@ -29,7 +29,7 @@ internal sealed class SteamOutput : IDisposable
             var profile=context.GetProfile("steam-controller-2")??throw new InvalidOperationException("HIDMaestro does not contain the Triton profile.");
             if(!profile.RequiresUsbipBackend || profile.VendorId!=0x28DE || profile.ProductId!=0x1302 || profile.InputReportSize!=54)
                 throw new InvalidOperationException("The Steam controller profile does not match the expected USB/Triton identity.");
-            controller=context.CreateController(profile,"grimm-g7bridge-triton-v1");
+            controller=context.CreateController(profile,VirtualControllerIdentity.Key);
             controller.SubmitRawExtendedReport(TritonProtocol.Encode(default,default,sequence++,0));
             controller.OutputReceived+=OnOutput;
         } catch { context.Dispose();throw; }

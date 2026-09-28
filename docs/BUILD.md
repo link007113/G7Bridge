@@ -36,6 +36,8 @@ Output: `artifacts/installer/G7Bridge-<version>-Setup-x64.exe` and `SHA256SUMS.t
 
 The installer follows the Windows **UI language** through Inno Setup's `uilanguage` detection, with English first and Dutch second. The app uses `CultureInfo.CurrentUICulture`, normalized to English or Dutch. Technical service logs are English. The service exposes stable attention codes, so UI messages do not depend on parsing translated diagnostic text.
 
+The live diagram uses a separate, normal-user HID reader. `VirtualControllerIdentity` derives the unchanged USB serial from the pinned HIDMaestro 1.9 identity key. Both enumeration and each opened handle check VID/PID, the vendor usage page, report size and that exact serial. No physical GameSir channel is opened by this viewer. Rumble testing writes the documented Triton 0x80 report, padded to the Windows HID output size, and follows the same existing feedback route as game rumble. There is no new privileged IPC channel. Unit tests cover decoding, freshness, identity scope and stop-on-cancel/failure behavior without HID access.
+
 ## Installer lifecycle
 
 - Inno Setup owns the fixed Program Files directory, Start menu / optional desktop shortcuts and Windows uninstall registration.

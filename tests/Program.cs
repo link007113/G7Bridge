@@ -2,6 +2,79 @@ using G7Bridge.Core;
 using System.Buffers.Binary;
 
 var tests = new (string Name, Action Body)[] {
+    ("Monitor targets only the bridge serial, never a physical or unrelated Steam Controller",()=>{
+        Equal("HM5AB6FC945E5A",VirtualControllerIdentity.UsbSerial);
+        True(VirtualControllerIdentity.Matches(0x28DE,0x1302,0xFF00,54,"HM5AB6FC945E5A"));
+        True(!VirtualControllerIdentity.Matches(0x28DE,0x1302,0xFF00,54,"FXA996020001"));
+        True(!VirtualControllerIdentity.Matches(0x3537,0x106B,0xFF00,54,"HM5AB6FC945E5A"));
+        True(!VirtualControllerIdentity.Matches(0x28DE,0x1302,1,54,"HM5AB6FC945E5A"));
+        True(!VirtualControllerIdentity.Matches(0x28DE,0x1302,0xFF00,64,"HM5AB6FC945E5A"));
+        True(!VirtualControllerIdentity.Matches(0x28DE,0x1302,0xFF00,54,null));
+    }),
+    ("Readback decodes independent extra buttons and signed axes from a Windows Triton report",()=>{
+        var monitor=new VirtualInputMonitor();var report=new byte[54];
+        byte[] header=[0x42,0xA7,0x91,0x00,0x06,0x00,0xFF,0x7F,0x00,0x40,0x00,0x80,0xFF,0x7F,0x34,0x12,0xCC,0xED];
+        header.CopyTo(report,0);
+        True(monitor.Accept(report,1000));var state=monitor.Snapshot(1001);
+        True(state.Fresh);Equal(1L,state.Reports);
+        Equal(PadButtons.A|PadButtons.Share|PadButtons.R4|PadButtons.L4|PadButtons.L5,state.Pad.Buttons);
+        Equal(short.MinValue,state.Pad.LX);Equal(short.MaxValue,state.Pad.LY);
+        Equal((short)0x1234,state.Pad.RX);Equal((short)-0x1234,state.Pad.RY);
+        Equal((ushort)32767,state.Pad.LT);Equal((ushort)16384,state.Pad.RT);
+        Equal(-1f,VirtualPadState.Axis(state.Pad.LX));Equal(1f,VirtualPadState.Trigger(state.Pad.LT));
+    }),
+    ("Battery and malformed reports cannot overwrite readback buttons; stale input clears",()=>{
+        var monitor=new VirtualInputMonitor();var down=new byte[54];down[0]=0x42;down[2]=1;
+        True(monitor.Accept(down,1000));True(!monitor.Accept(new byte[53],1010));
+        var battery=new byte[54];battery[0]=0x43;battery[2]=99;True(!monitor.Accept(battery,1200));
+        Equal(PadButtons.A,monitor.Snapshot(1250).Pad.Buttons);
+        var stale=monitor.Snapshot(1600);True(!stale.Fresh);Equal(PadButtons.None,stale.Pad.Buttons);
+        monitor.Clear();True(!monitor.Snapshot(1100).Fresh);
+    }),
+    ("Readback preserves a short press for the last-button label after release",()=>{
+        var monitor=new VirtualInputMonitor();var down=new byte[54];down[0]=0x42;down[4]=2;
+        True(monitor.Accept(down,1000));down[4]=0;True(monitor.Accept(down,1008));
+        var state=monitor.Snapshot(1033);Equal(PadButtons.None,state.Pad.Buttons);Equal(PadButtons.L4,state.LastPressed);
+    }),
+    ("Gyro readback preserves signed sensor values and clears motion when input goes stale",()=>{
+        var monitor=new VirtualInputMonitor();var report=new byte[54];report[0]=0x42;
+        byte[] sensors=[0x00,0x40,0x00,0xC0,0x01,0x00,0x00,0x40,0x00,0xE0,0x00,0x80];
+        sensors.CopyTo(report,34);True(monitor.Accept(report,100));
+        var motion=monitor.Snapshot(101).Motion;
+        Equal((short)16384,motion.GX);Equal((short)-8192,motion.GY);Equal(short.MinValue,motion.GZ);
+        Equal((short)16384,motion.AX);Equal((short)-16384,motion.AY);Equal((short)1,motion.AZ);
+        Equal(default(MotionState),monitor.Snapshot(700).Motion);
+    }),
+    ("Rumble test writes the known report and pads only to the HID output length",()=>{
+        var report=RumbleTest.Report(0x4000,64);Equal(64,report.Length);
+        Equal("80000000004000004000",Convert.ToHexString(report.AsSpan(0,10)));
+        True(report.AsSpan(10).IndexOfAnyExcept((byte)0)<0);
+        True(TritonFeedback.TryRumble(report[0],report.AsSpan(1,9),out var motors));Equal(0x40004000u,motors);
+        True(RumbleTest.Report(0,64).AsSpan(1).IndexOfAnyExcept((byte)0)<0);
+        bool rejected=false;try{RumbleTest.Report(1,9);}catch(ArgumentOutOfRangeException){rejected=true;}True(rejected);
+    }),
+    ("Cancelling a rumble test still sends neutral through a separate stop token",()=>{
+        using var cancel=new CancellationTokenSource();var sent=new List<ushort>();
+        try {
+            RumbleTest.RunAsync((value,token)=>{sent.Add(value);if(value!=0)cancel.Cancel();else True(!token.IsCancellationRequested);return ValueTask.CompletedTask;},cancel.Token).GetAwaiter().GetResult();
+        }catch(OperationCanceledException){ }
+        True(sent.Count==2);Equal(RumbleTest.Strength,sent[0]);Equal((ushort)0,sent[^1]);
+    }),
+    ("A failed rumble write still attempts neutral; pre-cancelled tests send nothing",()=>{
+        var sent=new List<ushort>();bool failed=false;
+        try {RumbleTest.RunAsync((value,_)=>{sent.Add(value);if(value!=0)throw new IOException("disconnected");return ValueTask.CompletedTask;},CancellationToken.None).GetAwaiter().GetResult();}
+        catch(IOException){failed=true;}
+        True(failed);Equal((ushort)0,sent[^1]);
+        sent.Clear();using var cancel=new CancellationTokenSource();cancel.Cancel();
+        try {RumbleTest.RunAsync((value,_)=>{sent.Add(value);return ValueTask.CompletedTask;},cancel.Token).GetAwaiter().GetResult();}catch(OperationCanceledException){ }
+        Equal(0,sent.Count);
+    }),
+    ("A completed rumble test is bounded and ends with an explicit neutral command",()=>{
+        var sent=new List<ushort>();
+        RumbleTest.RunAsync((value,_)=>{sent.Add(value);return ValueTask.CompletedTask;},CancellationToken.None).GetAwaiter().GetResult();
+        True(sent.Count>=2);True(sent.Take(sent.Count-1).All(value=>value==0x4000));Equal((ushort)0,sent[^1]);
+        Equal(400,RumbleTest.DurationMilliseconds);Equal(40,RumbleTest.ResendMilliseconds);
+    }),
     ("UI follows the Windows display language, with English as the fallback",()=>{
         foreach(string culture in new[]{"en-US","en-GB","de-DE","fr-FR","ja-JP",""})
             Equal("en",UiLanguage.Select(System.Globalization.CultureInfo.GetCultureInfo(culture)));

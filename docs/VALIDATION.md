@@ -14,7 +14,13 @@ The 1.1 release build passed 47 core tests, 15 native API tests and 21 native co
 
 This release changes distribution, setup lifecycle, language selection and presentation. It retains the controller packet formats and forwarding algorithms. Core tests cover English fallback, Dutch display-language selection and exact service-command ownership. Native suites use in-memory providers.
 
-The new installer, clean install, upgrade, uninstall, driver-reboot flow and over-the-shoulder administrator credentials have **not been executed for acceptance**. No new controller test was performed for this packaging release. Treat `1.1.0-rc.2` as a preview until these have been assessed manually.
+The authorized in-place upgrade from 1.0 to 1.1.0-rc.2 completed on the development PC with installer exit code 0 and no reboot, and the app was reopened normally. Clean install, uninstall, driver-reboot flow and over-the-shoulder administrator credentials have **not been executed for acceptance**. No new controller test was performed for the packaging release.
+
+## 1.2 live input display and manual rumble test
+
+The GUI reads the owned virtual Steam Controller's HID input back from Windows and displays its buttons, sticks, triggers and three gyro rates. Device selection requires the existing bridge identity; the protocol and physical-input route are unchanged. The manual rumble button sends a bounded 400 ms pulse at one-quarter strength to the two main motors through the existing virtual-controller feedback route. Hiding/closing cancels the pulse and an explicit neutral command is attempted on completion, cancellation and failure.
+
+Offline tests cover the report decoder, stale input, signed gyro data, identity scope, rumble formatting, and neutral commands on success/cancellation/failure. English and Dutch layouts are rendered with explicitly labelled sample input. No physical rumble test or live viewer acceptance has been performed by the development assistant for this feature. Treat `1.2.0-rc.1` as a preview pending the user's own controller checks.
 
 ## Manual acceptance checklist
 
@@ -27,5 +33,7 @@ On a suitable test machine, with permission to install the components:
 - Upgrade an existing installation, preserving settings and unrelated HidHide rules.
 - Uninstall through Windows Apps; confirm the service and owned hiding rules are removed, while shared drivers and unrelated rules are retained.
 - Check setup failure reporting and the driver restart prompt.
+- Open the live diagram and press each physical button, move both sticks/triggers and rotate the controller; confirm the corresponding virtual input indicators respond.
+- Click the rumble test yourself; confirm both main motors pulse briefly and stop, including when minimizing or closing the window.
 
 Do not equate the static build, unit tests or UI layout preview with completion of these manual checks.

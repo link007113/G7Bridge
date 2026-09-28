@@ -4,7 +4,7 @@
 
 **[Download the Windows installer](https://github.com/link007113/G7Bridge/releases)** · [Nederlandse handleiding](docs/README.nl.md) · [Report a problem](https://github.com/link007113/G7Bridge/issues)
 
-The current installer release is **1.1.0-rc.2 (preview)**. The underlying controller bridge has been exercised on a real G7 Pro. This new installer, upgrade and uninstall flow still needs manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
+The current installer release is **1.2.0-rc.1 (preview)**. The underlying controller bridge has been exercised on a real G7 Pro. This new installer, upgrade and uninstall flow still needs manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ The current installer release is **1.1.0-rc.2 (preview)**. The underlying contro
 
 ## Install and play
 
-1. Download **`G7Bridge-1.1.0-rc.2-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
+1. Download **`G7Bridge-1.2.0-rc.1-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
 2. Exit an older G7 Bridge instance, run the installer and accept the Windows elevation prompt and the bundled Microsoft GameInput terms. The installer includes the app, its .NET runtime and required controller drivers. USB devices may briefly reconnect during the first driver installation. Restart Windows if setup asks.
 3. Close GameSir Nexus, connect the 2.4 GHz receiver and turn on the controller.
 4. Open **G7 Bridge** from the Start menu or desktop shortcut. Once ready, the window moves to the system tray.
@@ -43,6 +43,12 @@ The setup executable is currently **unsigned**, so Windows may show an unknown-p
 Extra buttons and motion require appropriate Steam Input bindings. A game that only accepts XInput will receive the actions configured by Steam; installing the bridge does not add native gyro support to that game's own input API. Existing firmware button remaps do not duplicate the independent extra button input in the virtual controller.
 
 ## Daily use
+
+The status window includes a **live controller diagram**. Buttons light up, stick markers move, triggers show their percentage, and three gyro bars show angular speed in degrees per second. L4/R4/L5/R5, Guide and Share are included. The last-press label also retains short button presses.
+
+The diagram reads input **back from the virtual Steam Controller through Windows HID**. It selects only G7 Bridge's stable virtual identity. This shows what Windows receives; a game's Steam Input bindings still determine the resulting actions. Stale or disconnected input clears the display. Reading stops while the window is hidden.
+
+**Test rumble (0.4 s)** sends a short, moderate pulse to both main motors through the virtual controller and the bridge's normal feedback path. It is enabled only with fresh virtual input and an active bridge. The pulse ends with a neutral command, and hiding/closing the window cancels it. No test is started automatically. Trigger vibration is not part of this test.
 
 - **Minimize:** keep playing; the service and virtual controller remain active.
 - **Open the shortcut again / double-click the tray icon:** show the status window.

@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.1.0-rc.2"
+  #define AppVersion "1.2.0-rc.1"
 #endif
 #ifndef PackageDir
   #define PackageDir "..\artifacts\package"
@@ -36,7 +36,7 @@ SetupLogging=yes
 ShowLanguageDialog=no
 LanguageDetectionMethod=uilanguage
 UsePreviousLanguage=no
-VersionInfoVersion=1.1.0.0
+VersionInfoVersion=1.2.0.0
 VersionInfoProductName=G7 Bridge
 VersionInfoDescription=G7 Bridge Setup
 
