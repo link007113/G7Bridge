@@ -1,7 +1,130 @@
 using G7Bridge.Core;
 using System.Buffers.Binary;
+using System.Globalization;
 
+UiLanguage.Initialize(CultureInfo.InvariantCulture);
 var tests = new (string Name, Action Body)[] {
+    ("Only the USB root of a supported GameSir receiver is selectable",()=>{
+        True(ReceiverPresence.IsReceiverRoot(@"USB\VID_3537&PID_106B\0000DF3F3CCA6347"));
+        True(ReceiverPresence.IsReceiverRoot(@"usb\vid_3537&pid_100a\00CC848C41"));
+        True(!ReceiverPresence.IsReceiverRoot(@"USB\VID_3537&PID_100A&MI_00\8&31B07931&0&0000"));
+        True(!ReceiverPresence.IsReceiverRoot(@"HID\VID_3537&PID_106B\0000"));
+        True(!ReceiverPresence.IsReceiverRoot(@"USB\VID_3537&PID_0575\7&1441131D&0&4"));
+        True(!ReceiverPresence.IsReceiverRoot(@"USB\VID_045E&PID_02FF&IG_00\00&00&0000DF3F3CCA6347"));
+    }),
+    ("A receiver without controller children reports no controller; captured 106B children do",()=>{
+        True(!ReceiverPresence.HasController([]));
+        True(ReceiverPresence.HasController([@"USB\VID_045E&PID_02FF&IG_00\00&00&0000DF3F3CCA6347",@"HID\VID_045E&PID_02FF&IG_00\9&1C728799&0&0000"]));
+    }),
+    ("Always-present 100A interfaces do not count as a connected controller",()=>{
+        True(!ReceiverPresence.HasController([@"USB\VID_3537&PID_100A&MI_00\8&31B07931&0&0000",@"USB\VID_3537&PID_100A&MI_01\8&31B07931&0&0001",
+            @"HID\VID_3537&PID_100A&MI_01&COL01\9&1DB5C6EA&0&0000",@"HID\VID_3537&PID_100A&MI_01&COL04\9&1DB5C6EA&0&0003"]));
+        // Recorded by Windows on the development PC in the 100A window of 2026-09-28 18:32:53-18:33:02, controller on.
+        True(ReceiverPresence.HasController([@"USB\VID_3537&PID_100A&MI_00\8&31B07931&0&0000",@"USB\VID_3537&PID_100A&IG_02\9&5F23AA5&0&02",@"HID\VID_3537&PID_100A&IG_02\A&2EE197D2&0&0000"]));
+    }),
+    ("Only the 106B session receiver has hideable paired controller children",()=>{
+        True(ReceiverPresence.IsSessionRoot(@"USB\VID_3537&PID_106B\0000DF3F3CCA6347"));
+        True(!ReceiverPresence.IsSessionRoot(@"USB\VID_3537&PID_100A\00CC848C41"));
+    }),
+    ("A present controller that Windows does not report within ten seconds counts as a failed session",()=>{
+        var gate=new ConnectionGate();
+        Equal(GateAction.Start,gate.Next(true,0));
+        Equal(GateAction.Wait,gate.NotReported(9_999,hidingApplies:true));Equal(GateAction.Wait,gate.NotReported(10_000,true));
+        Equal(GateAction.Wait,gate.NotReported(19_999,true));Equal(GateAction.Wait,gate.NotReported(20_000,true));True(gate.HoldHiding);
+        Equal(GateAction.Wait,gate.NotReported(29_999,true));Equal(GateAction.Release,gate.NotReported(30_000,true));True(!gate.HoldHiding);
+    }),
+    ("A controller turned on again gets a fresh grace period",()=>{
+        var gate=new ConnectionGate();
+        Equal(GateAction.Start,gate.Next(true,0));Equal(GateAction.Wait,gate.NotReported(10_000,true));
+        Equal(GateAction.Wait,gate.Next(false,11_000));Equal(GateAction.Start,gate.Next(true,50_000));
+        Equal(GateAction.Wait,gate.NotReported(59_999,true));
+        // Only failures after the re-arm count: the in-grace report above must not be one of them.
+        Equal(GateAction.Start,gate.Next(true,60_000));Equal(GateAction.Wait,gate.SessionEnded(false));
+        Equal(GateAction.Start,gate.Next(true,61_000));Equal(GateAction.Wait,gate.SessionEnded(false));
+        Equal(GateAction.Start,gate.Next(true,62_000));Equal(GateAction.Release,gate.SessionEnded(false));
+    }),
+    ("The report grace period restarts after every session",()=>{
+        var gate=new ConnectionGate();
+        Equal(GateAction.Start,gate.Next(true,0));Equal(GateAction.Wait,gate.SessionEnded(true));
+        // Silence right after the session is still within its own grace period, so release needs the full 3 x 10 s.
+        Equal(GateAction.Start,gate.Next(true,100_000));Equal(GateAction.Wait,gate.NotReported(105_000,true));
+        Equal(GateAction.Wait,gate.NotReported(115_000,true));Equal(GateAction.Wait,gate.NotReported(125_000,true));
+        Equal(GateAction.Release,gate.NotReported(135_000,true));
+    }),
+    ("Failures on the 100A identity never release hiding because it does not apply there",()=>{
+        var gate=new ConnectionGate();
+        for(int i=0;i<6;i++){Equal(GateAction.Start,gate.Next(true,i*60_000L));Equal(GateAction.Wait,gate.SessionEnded(false,hidingApplies:false));}
+        for(long t=400_000;t<500_000;t+=10_000)Equal(GateAction.Wait,gate.NotReported(t,false));
+        True(gate.HoldHiding);True(!gate.Released);Equal(GateAction.Start,gate.Next(true,500_000));
+    }),
+    ("Waiting for an absent controller keeps hiding and never starts a session",()=>{
+        var gate=new ConnectionGate();
+        for(int i=0;i<20;i++){Equal(GateAction.Wait,gate.Next(controllerPresent:false));True(gate.HoldHiding);}
+        Equal(GateAction.Start,gate.Next(controllerPresent:true));
+    }),
+    ("Three failed sessions with the controller present release hiding until it disconnects",()=>{
+        var gate=new ConnectionGate();
+        for(int i=1;i<=2;i++){Equal(GateAction.Start,gate.Next(true));Equal(GateAction.Wait,gate.SessionEnded(receivedTelemetry:false));True(gate.HoldHiding);}
+        Equal(GateAction.Start,gate.Next(true));Equal(GateAction.Release,gate.SessionEnded(receivedTelemetry:false));
+        True(!gate.HoldHiding);True(gate.Released);
+        for(int i=0;i<5;i++)Equal(GateAction.Wait,gate.Next(true));
+        Equal(GateAction.Wait,gate.Next(false));True(gate.HoldHiding);True(!gate.Released);
+        Equal(GateAction.Start,gate.Next(true));Equal(GateAction.Wait,gate.SessionEnded(false));True(gate.HoldHiding);
+    }),
+    ("A session that received telemetry resets the failure count",()=>{
+        var gate=new ConnectionGate();
+        foreach(bool worked in new[]{false,false,true,false,false}){Equal(GateAction.Start,gate.Next(true));Equal(GateAction.Wait,gate.SessionEnded(worked));}
+        True(gate.HoldHiding);True(!gate.Released);
+    }),
+    ("Battery alerts fire once at 20% and 10% while discharging",()=>{
+        var alerts=new BatteryAlerts();
+        byte?[] expected=new byte?[101];expected[20]=20;expected[10]=10;
+        for(int level=100;level>=0;level--)Equal(expected[level],alerts.Observe((byte)level,charging:false));
+    }),
+    ("A controller first seen below 10% gets one alert, not both",()=>{
+        var alerts=new BatteryAlerts();
+        Equal((byte?)10,alerts.Observe(8,false));
+        for(int level=7;level>=0;level--)Equal((byte?)null,alerts.Observe((byte)level,false));
+    }),
+    ("Battery jitter does not repeat an alert; charging or +5% re-arms it",()=>{
+        var alerts=new BatteryAlerts();
+        Equal((byte?)20,alerts.Observe(20,false));
+        foreach(byte level in new byte[]{21,20,22,19,24,20})Equal((byte?)null,alerts.Observe(level,false));
+        Equal((byte?)null,alerts.Observe(25,false));Equal((byte?)20,alerts.Observe(20,false));
+        Equal((byte?)null,alerts.Observe(18,true));Equal((byte?)20,alerts.Observe(18,false));
+    }),
+    ("Unknown battery readings neither alert nor re-arm",()=>{
+        var alerts=new BatteryAlerts();
+        Equal((byte?)20,alerts.Observe(20,false));Equal((byte?)null,alerts.Observe(null,false));
+        Equal((byte?)null,alerts.Observe(19,false));
+    }),
+    ("Autostart command quotes the installed path and starts in the tray",()=>{
+        Equal("\"C:\\Program Files\\Grimm\\G7Bridge\\G7Bridge.exe\" --tray",AutostartEntry.Command(@"C:\Program Files\Grimm\G7Bridge\G7Bridge.exe"));
+    }),
+    ("Autostart is enabled only for this executable and when Windows has not disabled it",()=>{
+        string exe=@"C:\Program Files\Grimm\G7Bridge\G7Bridge.exe",command=AutostartEntry.Command(exe);
+        True(AutostartEntry.IsEnabled(command,exe,null));
+        True(AutostartEntry.IsEnabled(command.ToLowerInvariant(),exe,[2,0,0,0,0,0,0,0,0,0,0,0]));
+        True(!AutostartEntry.IsEnabled(null,exe,null));
+        True(!AutostartEntry.IsEnabled(AutostartEntry.Command(@"D:\Old\G7Bridge.exe"),exe,null));
+        True(!AutostartEntry.IsEnabled(command,exe,[3,0,0,0,0,0,0,0,0,0,0,0]));
+        True(!AutostartEntry.IsEnabled("\""+exe+"\"",exe,null));
+    }),
+    ("Tray view reflects service, readiness, attention and battery",()=>{
+        Equal(TrayKind.Off,TrayView.From(running:false,current:false,ready:false,attention:"",battery:50,charging:false).Kind);
+        Equal((byte?)null,TrayView.From(false,false,false,"",50,false).Battery);
+        Equal(TrayKind.Waiting,TrayView.From(true,false,false,"",null,false).Kind);
+        Equal(TrayKind.Waiting,TrayView.From(true,true,false,"",null,false).Kind);
+        Equal(TrayKind.Attention,TrayView.From(true,true,false,"output",null,false).Kind);
+        var active=TrayView.From(true,true,true,"",64,false);
+        Equal(TrayKind.Active,active.Kind);Equal((byte?)64,active.Battery);
+        Equal("G7 Bridge — active · battery 64%",active.Tooltip);
+        Equal("G7 Bridge — active · charging 64%",TrayView.From(true,true,true,"",64,true).Tooltip);
+        Equal("G7 Bridge — waiting for the controller",TrayView.From(true,true,false,"",null,false).Tooltip);
+        Equal("G7 Bridge — off",TrayView.From(false,false,false,"",null,false).Tooltip);
+        Equal("G7 Bridge — attention needed",TrayView.From(true,true,false,"driver",null,false).Tooltip);
+        True(TrayView.From(true,true,true,"",100,true).Tooltip.Length<=127);
+    }),
     ("Captured partial LT uses its physical position instead of the saturated processed field",()=>{
         var report=Convert.FromHexString("1000003CE0808080800F0400FF000000001500FCFFF3FF5FEF0D0DECE1000000006100007F7F007F7F007F7F007F7F00000000858084850F0400006B00000000");
         Equal((byte)255,report[12]);Equal((byte)107,report[59]);

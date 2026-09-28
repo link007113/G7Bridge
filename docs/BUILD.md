@@ -40,12 +40,20 @@ The live diagram uses a separate, normal-user HID reader. `VirtualControllerIden
 
 Trigger sourcing: GameSir E0 report bytes 59/60 provide the physical 8-bit LT/RT positions. Bytes 12/13 and the Windows/GIP state can already contain clipped/profile-processed values. Once vendor telemetry has arrived, `InputState` uses its fresh physical triggers alongside the higher-resolution Windows/GIP sticks. It releases triggers during telemetry gaps rather than jumping back to the processed values. An ordinary gamepad-only session keeps its existing trigger path. The captured regression payload and full 256-step sweep cover this boundary.
 
+Waiting and pacing:
+- `ReceiverScanner` reads present devices through cfgmgr32. A supported receiver root is `USB\VID_3537&PID_100A|106B`, and a connected controller is a present descendant with `&IG_`. The scan opens no device.
+- `ConnectionGate` decides between waiting, starting and releasing the hiding rule after three failed sessions. A present controller that GameInput does not report within ten seconds counts as a failed session. Failures on the 100A identity never release, because the paired rule only covers 106B children.
+- Nexus, a driver problem or several receivers release the rule while they last, and a failed release is retried.
+- During an input session, `TimerResolution` requests 1 ms timer resolution for the service process. Without it, short waits since Windows 10 2004 take the default ~15.6 ms tick.
+
+The app accepts `--tray` for its per-user `Run` entry: it starts without a window and never triggers setup elevation by itself. `Autostart` only registers the installed Program Files executable. The first run of a version with this feature enables it once, and afterwards only the user's choice counts. Tray icons are drawn at runtime as in-memory PNG ICO files. `--render-ui` also writes a `-tray.png` sheet with every icon state.
+
 ## Installer lifecycle
 
 - Inno Setup owns the fixed Program Files directory, Start menu / optional desktop shortcuts and Windows uninstall registration.
 - `--prepare-setup` validates the exact existing service command, stops only that service and recovers its own hiding journal. The new helper is extracted to setup's temporary directory before old binaries are replaced.
 - `--configure-service` installs required drivers, preserves settings, registers a demand-start LocalSystem service and grants local users query/start/stop access. Exit `3010` requests a Windows restart.
-- `--uninstall-service` stops/removes the own service and restores its hiding rules before Inno removes the binaries. Shared drivers and ProgramData settings are retained.
+- `--uninstall-service` stops/removes the own service and restores its hiding rules before Inno removes the binaries. Uninstall also removes the uninstalling user's `G7 Bridge` sign-in entry. Shared drivers and ProgramData settings are retained.
 - Unknown command-line options are rejected. Historical manual research windows are excluded from compilation; the shipped app always uses the service UI.
 
 The installer refuses an unrelated service that happens to use the same service name. It does not disable Developer Mode/security, flash firmware or remove other applications' virtual controllers.

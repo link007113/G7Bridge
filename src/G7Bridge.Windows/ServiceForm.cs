@@ -18,19 +18,26 @@ internal sealed class ServiceForm : Form
     private readonly ControllerDiagram diagram=new();
     private readonly Button power=new(){Text=L.Text("Turn on","Aanzetten"),AutoSize=true,Padding=new(10,4,10,4)};
     private readonly Button rumble=new(){Text=L.Text("Test rumble (0.4 s)","Triltest (0,4 s)"),AutoSize=true,Padding=new(10,4,10,4),Enabled=false};
-    private readonly NotifyIcon tray=new(){Text="G7 Bridge",Icon=SystemIcons.Application,Visible=true};
+    private readonly CheckBox autostart=new(){Text=L.Text("Start with Windows","Starten met Windows"),AutoSize=true,Margin=new(12,9,0,0)};
+    private readonly ToolStripMenuItem autostartItem=new(L.Text("Start with Windows","Starten met Windows")){CheckOnClick=true};
+    private readonly NotifyIcon tray=new(){Text="G7 Bridge",Visible=true};
     private readonly System.Windows.Forms.Timer statusTimer=new(){Interval=350};
     private readonly System.Windows.Forms.Timer inputTimer=new(){Interval=33};
     private readonly bool previewMode;
     private readonly VirtualControllerClient? controller;
-    private bool busy,closing,rumbleBusy,autoHide=true,serviceRunning;
+    private readonly BatteryAlerts batteryAlerts=new();
+    private bool busy,closing,rumbleBusy,autoHide=true,serviceRunning,startHidden,syncingAutostart;
     private string? lastProblem;
     private ServiceSnapshot? last;
+    private TrayView? trayView;
+    private string pendingAttention="",notifiedAttention="";
+    private long attentionSince;
 
-    internal ServiceForm(bool startAutomatically=true)
+    internal ServiceForm(bool startAutomatically=true,bool trayOnly=false)
     {
-        previewMode=!startAutomatically;
+        previewMode=!startAutomatically;startHidden=trayOnly;
         if(!previewMode)controller=new VirtualControllerClient();
+        tray.Icon=TrayIcons.Create(new(TrayKind.Waiting,null,false));
         Text="G7 Bridge";ClientSize=new(800,760);MinimumSize=new(690,580);StartPosition=FormStartPosition.CenterScreen;
         Font=new("Segoe UI",10);BackColor=Color.White;
         var panel=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new(20),ColumnCount=1,RowCount=9,AutoScroll=true};
@@ -41,20 +48,30 @@ internal sealed class ServiceForm : Form
         var row=new FlowLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,WrapContents=true,Margin=new(0)};
         row.Controls.Add(power);row.Controls.Add(rumble);
         var save=new Button{Text=L.Text("Save diagnostics","Diagnose opslaan"),AutoSize=true,Padding=new(8,4,8,4)};
-        save.Click+=(_,_)=>Export();row.Controls.Add(save);panel.Controls.Add(row,0,6);panel.Controls.Add(rumbleResult,0,7);
+        save.Click+=(_,_)=>Export();row.Controls.Add(save);row.Controls.Add(autostart);panel.Controls.Add(row,0,6);panel.Controls.Add(rumbleResult,0,7);
         panel.Controls.Add(new Label{Text=L.Text("Minimize to keep playing. Exit to stop the bridge. Configure game actions in Steam Input.","Minimaliseren laat de bridge aan. Afsluiten stopt de bridge. Spelacties stel je in via Steam Input."),AutoSize=true,MaximumSize=new(730,0),ForeColor=Color.DimGray,Margin=new(0,6,0,0)},0,8);
         Controls.Add(panel);
         var menu=new ContextMenuStrip();menu.Items.Add("Open G7 Bridge",null,(_,_)=>ShowWindow());
-        menu.Items.Add(L.Text("Turn off","Uitschakelen"),null,async(_,_)=>await Toggle(false));menu.Items.Add(L.Text("Exit","Afsluiten"),null,(_,_)=>Close());
+        menu.Items.Add(L.Text("Turn off","Uitschakelen"),null,async(_,_)=>await Toggle(false));menu.Items.Add(autostartItem);
+        menu.Items.Add(L.Text("Exit","Afsluiten"),null,(_,_)=>Close());
         tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>ShowWindow();
+        menu.Opening+=(_,_)=>SyncAutostart();
+        autostart.CheckedChanged+=(_,_)=>SetAutostart(autostart.Checked);
+        autostartItem.CheckedChanged+=(_,_)=>SetAutostart(autostartItem.Checked);
         power.Click+=async(_,_)=>await Toggle(GetState()!=ServiceControllerStatus.Running);
         rumble.Click+=async(_,_)=>await TestRumble();
         Resize+=(_,_)=>{if(WindowState==FormWindowState.Minimized)Hide();};
         VisibleChanged+=(_,_)=>{if(previewMode)return;inputTimer.Enabled=Visible;UpdateReadback();};
         FormClosing+=OnClosing;
         statusTimer.Tick+=(_,_)=>RefreshStatus();inputTimer.Tick+=(_,_)=>UpdateReadback();
-        if(!previewMode)statusTimer.Start();else tray.Visible=false;
-        if(startAutomatically)Shown+=async(_,_)=>{diagram.Focus();await Toggle(true);};
+        if(!previewMode){statusTimer.Start();Autostart.InitializeOnce();SyncAutostart();}else tray.Visible=false;
+        // A sign-in start stays in the tray and never asks for elevation by itself.
+        if(startAutomatically && trayOnly) {
+            // One-shot: a recreated window handle must not turn a stopped bridge back on.
+            void StartOnce(object? sender,EventArgs e){HandleCreated-=StartOnce;BeginInvoke(new Action(async()=>await Toggle(true,allowSetup:false)));}
+            HandleCreated+=StartOnce;
+        }
+        else if(startAutomatically)Shown+=async(_,_)=>{diagram.Focus();await Toggle(true);};
         if(!previewMode)showWait=ThreadPool.RegisterWaitForSingleObject(showSignal,(_,_)=>{
             try{if(!IsDisposed && IsHandleCreated)BeginInvoke(ShowWindow);}catch(InvalidOperationException){ }
         },null,Timeout.Infinite,false);
@@ -70,12 +87,14 @@ internal sealed class ServiceForm : Form
     private bool Current=>last is not null && (DateTimeOffset.Now-last.Updated).TotalSeconds is >=0 and <3;
     private bool Ready=>serviceRunning && Current && last!.VirtualController && last.TelemetryFresh && last.OutputReports>3;
 
-    private async Task Toggle(bool start)
+    private async Task Toggle(bool start,bool allowSetup=true)
     {
         if(previewMode || busy || closing)return;
         diagram.Focus();busy=true;power.Enabled=false;lastProblem=null;
         if(!start){controller?.SetEnabled(false);rumble.Enabled=false;}
         try {
+            if(GetState() is null && !allowSetup)
+                throw new IOException(L.Text("G7 Bridge setup is not finished. Open G7 Bridge to complete it.","De installatie van G7 Bridge is niet af. Open G7 Bridge om die te voltooien."));
             if(GetState() is null) {
                 phase.Text=L.Text("One-time setup","Eenmalige installatie");details.Text=L.Text("Windows will ask for permission to install the controller service and required drivers.","Windows vraagt eenmalig toestemming voor de controllerdienst en de benodigde drivers.");
                 string sid=System.Security.Principal.WindowsIdentity.GetCurrent().User!.Value;
@@ -102,7 +121,7 @@ internal sealed class ServiceForm : Form
             power.Text=serviceRunning?L.Text("Turn off","Uitzetten"):state is null?L.Text("Install","Installeren"):L.Text("Turn on","Aanzetten");
             if(lastProblem is not null){phase.Text=L.Text("Attention needed","Aandacht nodig");details.Text=lastProblem;return;}
             if(state is null){last=null;if(!busy){phase.Text=L.Text("Not installed yet","Nog niet geïnstalleerd");details.Text=L.Text("Install the bridge once. After that, just open it.","Installeer de bridge één keer. Daarna hoef je hem alleen te openen.");}return;}
-            if(state==ServiceControllerStatus.Stopped){last=null;phase.Text=L.Text("Turned off","Uitgeschakeld");details.Text=L.Text("The physical controller is available for normal use.","De fysieke controller is beschikbaar voor normaal gebruik.");tray.Text=L.Text("G7 Bridge — off","G7 Bridge — uit");return;}
+            if(state==ServiceControllerStatus.Stopped){last=null;phase.Text=L.Text("Turned off","Uitgeschakeld");details.Text=L.Text("The physical controller is available for normal use.","De fysieke controller is beschikbaar voor normaal gebruik.");return;}
             using var file=File.Open(ServiceFiles.StatusPath,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete);
             last=JsonSerializer.Deserialize<ServiceSnapshot>(file);
             if(last is null)return;
@@ -115,13 +134,67 @@ internal sealed class ServiceForm : Form
                     "close-nexus"=>L.Text("Close GameSir Nexus so the bridge can connect.","Sluit GameSir Nexus zodat de bridge verbinding kan maken."),
                     "multiple-controllers"=>L.Text("More than one GameSir receiver was found. Connect only the receiver you want to use.","Er is meer dan één GameSir-ontvanger gevonden. Sluit alleen de gewenste ontvanger aan."),
                     "driver"=>L.Text("The controller drivers are not ready. Restart Windows after installation. Save diagnostics if this persists.","De controllerdrivers zijn nog niet beschikbaar. Herstart Windows na installatie. Sla de diagnose op als dit blijft gebeuren."),
+                    "connection"=>L.Text("The bridge could not connect three times, so the physical controller works normally again. Turn the controller off and on to retry.","De bridge kon drie keer geen verbinding maken, dus de fysieke controller werkt weer gewoon. Zet de controller uit en weer aan om het opnieuw te proberen."),
                     _=>L.Text("The virtual controller could not start. Save diagnostics for the error details.","De virtuele controller kon niet starten. Sla de diagnose op voor de foutdetails.")
                 };
             }
-            tray.Text=last.VirtualController && Current?L.Text("G7 Bridge — active","G7 Bridge — actief"):L.Text("G7 Bridge — connecting","G7 Bridge — verbinden");
             if(autoHide && Ready){autoHide=false;Hide();}
         } catch(IOException) { } catch(UnauthorizedAccessException) { } catch(JsonException) { }
-        finally {UpdateReadback();}
+        finally {UpdateTray();UpdateReadback();}
+    }
+
+    private void UpdateTray()
+    {
+        bool current=serviceRunning && Current;
+        var view=lastProblem is not null?new TrayView(TrayKind.Attention,null,false):
+            TrayView.From(serviceRunning,current,Ready,current?last!.Attention:"",current?last!.Battery:null,current && last!.Charging);
+        if(view!=trayView) {
+            trayView=view;
+            var old=tray.Icon;tray.Icon=TrayIcons.Create(view);old?.Dispose();
+            tray.Text=view.Tooltip;
+        }
+        if(batteryAlerts.Observe(current?last!.Battery:null,current && last!.Charging) is not null && last?.Battery is byte battery)
+            Notify(L.Text($"Controller battery at {battery}%",$"Accu van de controller op {battery}%"),L.Text("Charge the G7 Pro soon.","Laad de G7 Pro binnenkort op."),ToolTipIcon.Warning);
+        // A cause that persists for five seconds is announced once while the window is hidden,
+        // and not again until the bridge has worked; retry cycles briefly clear the service's cause.
+        string attention=view.Kind==TrayKind.Attention?lastProblem??last?.Attention??"":"";
+        if(attention!=pendingAttention){pendingAttention=attention;attentionSince=Environment.TickCount64;}
+        if(Ready)notifiedAttention="";
+        else if(attention.Length!=0 && attention!=notifiedAttention && !Visible && Environment.TickCount64-attentionSince>=5000) {
+            notifiedAttention=attention;
+            Notify(L.Text("G7 Bridge needs attention","G7 Bridge heeft aandacht nodig"),details.Text,ToolTipIcon.Warning);
+        }
+    }
+    private void Notify(string title,string text,ToolTipIcon icon)
+    {
+        if(!previewMode && !closing)tray.ShowBalloonTip(10000,title,text.Length==0?title:text,icon);
+    }
+    private void SyncAutostart()
+    {
+        if(previewMode)return;
+        syncingAutostart=true;
+        try {
+            bool enabled=Autostart.Enabled;
+            autostart.Checked=autostartItem.Checked=enabled;
+            autostart.Enabled=autostartItem.Enabled=Autostart.Available;
+        } catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) {
+            autostart.Enabled=autostartItem.Enabled=false;
+        } finally {syncingAutostart=false;}
+    }
+    private void SetAutostart(bool enabled)
+    {
+        if(syncingAutostart || previewMode)return;
+        try {Autostart.Set(enabled);}
+        catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException) {
+            MessageBox.Show(this,L.Text("Start with Windows could not be changed: ","Starten met Windows kon niet worden gewijzigd: ")+ex.Message,"G7 Bridge");
+        }
+        SyncAutostart();
+    }
+    protected override void SetVisibleCore(bool value)
+    {
+        // A sign-in start creates the window without showing it; the tray icon is the interface.
+        if(startHidden){startHidden=false;if(!IsHandleCreated)CreateHandle();value=false;}
+        base.SetVisibleCore(value);
     }
 
     private void UpdateReadback()
@@ -161,7 +234,7 @@ internal sealed class ServiceForm : Form
         readback.Text=L.Text("Virtual Steam Controller · sample input","Virtuele Steam Controller · voorbeeldinvoer");
         diagram.Frame=new(true,new(PadButtons.A|PadButtons.L4|PadButtons.R5|PadButtons.RB|PadButtons.R3,-16384,8192,12000,-14000,24000,8000),120,PadButtons.L4,new(1311,-819,410,0,16384,0));
         input.Text=L.Text("Last press: L4     ·     Battery: 75%","Laatste knop: L4     ·     Accu: 75%");
-        power.Text=L.Text("Turn off","Uitzetten");rumble.Enabled=true;
+        power.Text=L.Text("Turn off","Uitzetten");rumble.Enabled=true;autostart.Checked=true;
         Location=new Point(SystemInformation.VirtualScreen.Right+1000,SystemInformation.VirtualScreen.Bottom+1000);
         Show();Application.DoEvents();PerformLayout();
         using var bitmap=new Bitmap(Width,Height);DrawToBitmap(bitmap,new Rectangle(0,0,Width,Height));bitmap.Save(path,System.Drawing.Imaging.ImageFormat.Png);
@@ -169,7 +242,7 @@ internal sealed class ServiceForm : Form
     protected override bool ShowWithoutActivation=>true;
     protected override void Dispose(bool disposing)
     {
-        if(disposing){if(controller is not null)_=controller.StopAsync();showWait?.Unregister(null);showSignal.Dispose();statusTimer.Dispose();inputTimer.Dispose();tray.Dispose();}
+        if(disposing){if(controller is not null)_=controller.StopAsync();showWait?.Unregister(null);showSignal.Dispose();statusTimer.Dispose();inputTimer.Dispose();tray.Icon?.Dispose();tray.Dispose();}
         base.Dispose(disposing);
     }
     private void Export()

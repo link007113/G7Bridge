@@ -6,7 +6,7 @@ Gebruik je **GameSir G7 Pro via de 2,4GHz-ontvanger** als virtuele Steam Control
 
 ## Installeren
 
-1. Download **`G7Bridge-1.2.0-rc.2-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
+1. Download **`G7Bridge-1.3.0-rc.1-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
 2. Sluit een eventueel geopende G7 Bridge en voer de installer uit. Bevestig de Windows-beheerdersvraag en lees en accepteer de voorwaarden van het meegeleverde Microsoft GameInput-onderdeel. De app, .NET-runtime, dienst en benodigde drivers zitten in dit bestand. USB-apparaten kunnen bij de eerste driverinstallatie kort opnieuw verbinden. Herstart Windows als de installer daarom vraagt.
 3. Sluit GameSir Nexus, steek de 2,4GHz-ontvanger in en zet de controller aan.
 4. Open **G7 Bridge** via Start of de bureaubladsnelkoppeling. Zodra de verbinding gereed is, gaat het venster naar het systeemvak.
@@ -23,7 +23,7 @@ De eigen installer heeft nog geen codeondertekening. Windows kan daarom een meld
 - Gewone knoppen, sticks en triggers worden doorgegeven. Sticks behouden de Windows/GIP-resolutie; triggers gebruiken de fysieke analoge GameSir-stand met 256 stappen.
 - **L4, R4, L5 en R5** zijn vier onafhankelijke gripknoppen in Steam Input.
 - **Share** wordt een aparte Quick Access-invoer. Koppel daar in Steam Input de screenshotactie aan.
-- **Gyro, accelerometer, relatieve oriëntatie en accupercentage** worden doorgegeven.
+- **Gyro, accelerometer, relatieve oriëntatie en accupercentage** worden doorgegeven. De accu staat ook in het systeemvak, met een melding bij 20% en 10%.
 - **Gewone rumble op de twee hoofdmotoren** werkt via de Windows-gamepad-API, inclusief stoppen. Triggermotoren en speciale Steam-trackpadhaptiek worden nog niet aangestuurd.
 - De G7 heeft geen trackpads. De virtuele touchoppervlakken blijven onaangeraakt. Hardwareknoppen voor koppelen, profielen en instellingen blijven controllerfuncties.
 
@@ -41,13 +41,19 @@ Met **Triltest (0,4 s)** laat je beide hoofdmotoren kort en op gematigde sterkte
 
 **Minimaliseren** laat de bridge actief. Dubbelklik op het systeemvakicoon of open de snelkoppeling opnieuw om het venster terug te halen. **Uitzetten** stopt de bridge; **Afsluiten** sluit ook de app. Daarbij wordt de fysieke controller weer vrijgegeven.
 
+**Starten met Windows** (in het venster en het systeemvakmenu, standaard aan) start G7 Bridge bij het aanmelden in het systeemvak. De bridge wacht dan op de controller en verbindt zodra je hem aanzet. Dit is een instelling per gebruiker zonder beheerdersvraag. Je kunt hem ook uitzetten via **Instellingen → Apps → Opstarten**.
+
+Zolang de controller uit staat, opent de bridge hem niet. Hij kijkt twee keer per seconde in de apparatenlijst van Windows en laat de eigen verbergregel staan, zodat de controller al verborgen is voor andere programma's zodra hij verbindt. Lukt verbinden drie keer niet terwijl de controller aan staat (ook als Windows hem binnen tien seconden niet meldt), dan geeft de bridge de fysieke controller vrij voor normaal gebruik totdat je de controller uit en weer aan zet. Direct na het insteken van de ontvanger, vóór de eerste gyrostart, geldt de verbergregel nog niet; de bridge blijft het dan gewoon proberen.
+
+Het **systeemvakicoon** is een accu. Groen betekent actief met de accustand (rood als hij bijna leeg is), grijs betekent wachten of uit, en oranje betekent dat er iets aandacht nodig heeft; een bliksem betekent opladen. Beweeg eroverheen voor het precieze percentage. Bij 20% en 10% krijg je één keer per ontlaadbeurt een Windows-melding. Een aandachtspunt wordt één keer gemeld als het venster verborgen is.
+
 Nexus en Windows-ontwikkelaarsmodus zijn tijdens gebruik niet nodig. De dienst wordt op verzoek van de app gestart, niet automatisch bij het opstarten van Windows. Dagelijks gebruik vraagt geen beheerdersrechten.
 
 ## Bijwerken en verwijderen
 
 Sluit G7 Bridge en voer een nieuwe installer uit om bij te werken. Instellingen blijven behouden.
 
-Verwijderen gaat via **Windows-instellingen → Apps → Geïnstalleerde apps → G7 Bridge → Verwijderen**. Eerst afsluiten via het systeemvak. De uninstaller ruimt de eigen dienst, verbergregels, appbestanden en snelkoppelingen op. De gedeelde HidHide- en virtuele USB-drivers blijven staan omdat andere programma's ze kunnen gebruiken. Instellingen en diagnosebestanden blijven in `%PROGRAMDATA%\G7Bridge`.
+Verwijderen gaat via **Windows-instellingen → Apps → Geïnstalleerde apps → G7 Bridge → Verwijderen**. Eerst afsluiten via het systeemvak. De uninstaller ruimt de eigen dienst, verbergregels, appbestanden, snelkoppelingen en de opstartinstelling van de verwijderende gebruiker op. De gedeelde HidHide- en virtuele USB-drivers blijven staan omdat andere programma's ze kunnen gebruiken. Instellingen en diagnosebestanden blijven in `%PROGRAMDATA%\G7Bridge`.
 
 De app staat in `C:\Program Files\Grimm\G7Bridge`. De dienst `GrimmG7Bridge` draait als LocalSystem om GIP-achtergrondinvoer te lezen. Alleen de legacy-invoerinstanties van de geselecteerde GameSir worden voor games verborgen. Andere apparaten en bestaande HidHide-regels blijven behouden. Er worden geen fysieke firmware, controllerprofielen of Steam-updaterbestanden herschreven.
 
@@ -65,7 +71,7 @@ Kies **Diagnose opslaan** bij een foutmelding. De export bevat onder meer appara
 
 ## Status van deze release
 
-**1.2.0-rc.2 is een preview.** De bestaande bridge is met een echte G7 Pro gemeten. De nieuwe installer, upgrade- en verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Er zijn offline unittests en builds uitgevoerd; dat vervangt die installatieproef niet. Zie [de precieze validatiestatus](VALIDATION.md).
+**1.3.0-rc.1 is een preview.** De bestaande bridge is met een echte G7 Pro gemeten. De nieuwe installer, upgrade- en verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Er zijn offline unittests en builds uitgevoerd; dat vervangt die installatieproef niet. Zie [de precieze validatiestatus](VALIDATION.md).
 
 [Broncode bouwen](BUILD.md) · [Onderdelen en licenties](../DEPENDENCIES.md)
 

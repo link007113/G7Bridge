@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.2.0-rc.2"
+  #define AppVersion "1.3.0-rc.1"
 #endif
 #ifndef PackageDir
   #define PackageDir "..\artifacts\package"
@@ -163,5 +163,8 @@ begin
     if not Exec(ExpandConstant('{app}\G7Bridge.exe'), '--uninstall-service', ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code) then
       RaiseException(FmtMessage(CustomMessage('RemovalFailed'), [ErrorLog]));
     if Code <> 0 then RaiseException(FmtMessage(CustomMessage('RemovalFailed'), [ErrorLog]));
+    // The app creates its sign-in start per user; remove it for the uninstalling user.
+    RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'G7 Bridge');
+    RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run', 'G7 Bridge');
   end;
 end;
