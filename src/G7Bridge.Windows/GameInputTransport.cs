@@ -98,7 +98,9 @@ internal sealed class GameInputTransport : IControllerTransport
                 var packet=GameInputPackets.Normalize(id,raw.AsSpan(0,(int)size));
                 if(packet is not null){packet.CopyTo(data,0);return packet.Length;}
             } else {
-                if(token.WaitHandle.WaitOne(4)) token.ThrowIfCancellationRequested();
+                // Telemetry arrives about every 16 ms; a short wait picks it up promptly.
+                // This relies on the session's 1 ms timer resolution (TimerResolution).
+                if(token.WaitHandle.WaitOne(1)) token.ThrowIfCancellationRequested();
             }
         }
         return 0;

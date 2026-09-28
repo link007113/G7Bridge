@@ -54,6 +54,7 @@ internal sealed class BridgeSession : IAsyncDisposable
 
     private async Task Run(ControllerDevice device,CancellationToken stop)
     {
+        using var resolution=TimerResolution.Request(1);
         IControllerTransport? transport=null;
         try {
             transport=Open(device);

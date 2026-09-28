@@ -41,19 +41,24 @@ internal static class Program
             }
         }
         // Only the non-interactive layout helper accepts a language override.
+        bool trayOnly=args is [AutostartEntry.TrayArgument];
         if (args is ["--render-ui", _, var language] && language is "en" or "nl")
             UiLanguage.Initialize(CultureInfo.GetCultureInfo(language));
-        else if (args.Length!=0 && args is not ["--render-ui", _]) return 2;
+        else if (args.Length!=0 && !trayOnly && args is not ["--render-ui", _]) return 2;
 
         ApplicationConfiguration.Initialize();
         if (args.Length>=2 && args[0]=="--render-ui")
         {
             using var preview=new ServiceForm(startAutomatically:false);
-            preview.RenderPreview(args[1]); return 0;
+            preview.RenderPreview(args[1]);
+            TrayIcons.RenderSheet(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[1]))!,Path.GetFileNameWithoutExtension(args[1])+"-tray.png"));
+            return 0;
         }
         using var mutex=new Mutex(true,"Local\\Grimm.G7Bridge",out bool owner);
         if (!owner)
         {
+            // A sign-in start never brings an already running window forward.
+            if (trayOnly) return 0;
             try { using var show=EventWaitHandle.OpenExisting(ServiceForm.ShowSignal); show.Set(); return 0; }
             catch (WaitHandleCannotBeOpenedException)
             {
@@ -61,7 +66,7 @@ internal static class Program
                 return 1;
             }
         }
-        Application.Run(new ServiceForm());
+        Application.Run(new ServiceForm(trayOnly:trayOnly));
         return 0;
     }
 

@@ -4,7 +4,7 @@
 
 **[Download the Windows installer](https://github.com/link007113/G7Bridge/releases)** · [Nederlandse handleiding](docs/README.nl.md) · [Report a problem](https://github.com/link007113/G7Bridge/issues)
 
-The current installer release is **1.2.0-rc.2 (preview)**. The underlying controller bridge has been exercised on a real G7 Pro. This new installer, upgrade and uninstall flow still needs manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
+The current installer release is **1.3.0-rc.1 (preview)**. The underlying controller bridge has been exercised on a real G7 Pro. This new installer, upgrade and uninstall flow still needs manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ The current installer release is **1.2.0-rc.2 (preview)**. The underlying contro
 
 ## Install and play
 
-1. Download **`G7Bridge-1.2.0-rc.2-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
+1. Download **`G7Bridge-1.3.0-rc.1-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
 2. Exit an older G7 Bridge instance, run the installer and accept the Windows elevation prompt and the bundled Microsoft GameInput terms. The installer includes the app, its .NET runtime and required controller drivers. USB devices may briefly reconnect during the first driver installation. Restart Windows if setup asks.
 3. Close GameSir Nexus, connect the 2.4 GHz receiver and turn on the controller.
 4. Open **G7 Bridge** from the Start menu or desktop shortcut. Once ready, the window moves to the system tray.
@@ -34,7 +34,7 @@ The setup executable is currently **unsigned**, so Windows may show an unknown-p
 | L4, R4, L5 and R5 | Four independent grip buttons, assignable in Steam Input |
 | Share / screenshot | An independent Quick Access input; assign the screenshot action in Steam Input |
 | Gyroscope and accelerometer | Motion data forwarded to Steam Input, with relative orientation |
-| Battery | Reported to the virtual controller and shown in the app |
+| Battery | Reported to the virtual controller, shown in the app and tray icon, with notifications at 20% and 10% |
 | Standard rumble | Left and right main motors, including stop requests |
 | Trigger-motor vibration | Not implemented |
 | Steam trackpad haptic patterns | Not implemented |
@@ -58,7 +58,11 @@ The diagram reads input **back from the virtual Steam Controller through Windows
 - **Turn off:** stop the bridge and restore normal access to the physical controller.
 - **Exit:** stop the bridge and close the app.
 
-The service starts when the app requests it. It is not configured to start at boot. Automatic receiver discovery expects one supported receiver.
+**Start with Windows** (in the window and the tray menu, on by default) starts G7 Bridge in the tray when you sign in. The bridge then waits for the controller and connects as soon as you turn it on. It is a per-user sign-in entry that needs no administrator prompt. Windows' **Settings → Apps → Startup** page can also turn it off. The service itself starts only when the app requests it and is not configured to start at boot. Automatic receiver discovery expects one supported receiver.
+
+While the controller is off, the bridge only checks Windows' device list. It opens nothing and keeps its own hiding rule in place, so the controller is already hidden from other applications when it connects. If a connection fails three times while the controller is on, the bridge releases the physical controller for normal use until you turn the controller off and on again.
+
+The **tray icon** shows a battery. Green is active and shows the charge level (red when low), grey is waiting or off, and orange needs attention; a lightning bolt means charging. Hover over it for the exact percentage. Windows notifications appear at 20% and 10% battery, once per discharge. An attention message is announced once while the window is hidden.
 
 ## What setup installs
 
@@ -72,7 +76,7 @@ The bridge does not flash GameSir firmware or rewrite hardware profiles. It read
 
 **Update:** exit G7 Bridge and run the newer installer. The installation path and existing settings are retained. No manual driver installation is required.
 
-**Uninstall:** exit G7 Bridge, then use **Windows Settings → Apps → Installed apps → G7 Bridge → Uninstall**. The uninstaller stops and removes the bridge service, restores its own device-hiding rules, and removes its installed app files and shortcuts. Shared HidHide / USB drivers stay installed because other applications may use them. Settings and diagnostics in `%PROGRAMDATA%\G7Bridge` are retained.
+**Uninstall:** exit G7 Bridge, then use **Windows Settings → Apps → Installed apps → G7 Bridge → Uninstall**. The uninstaller stops and removes the bridge service, restores its own device-hiding rules, and removes its installed app files, shortcuts and the uninstalling user's sign-in start entry. Shared HidHide / USB drivers stay installed because other applications may use them. Settings and diagnostics in `%PROGRAMDATA%\G7Bridge` are retained.
 
 ## Troubleshooting
 

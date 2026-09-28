@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Principal;
+using G7Bridge.Core;
 using System.ServiceProcess;
 using System.Text.Json;
 
@@ -26,6 +27,7 @@ internal sealed class ServiceSnapshot
     public string SourceReport {get;set;}="";
     public string HiddenInstance {get;set;}="";
     public byte? Battery {get;set;}
+    public bool Charging {get;set;}
     public bool FullResolutionAxes {get;set;}
     public long FeedbackPackets {get;set;}
     public long RumbleUpdates {get;set;}
@@ -95,19 +97,18 @@ internal sealed class ControllerService : ServiceBase
     {
         var state=new ServiceSnapshot{SystemAccount=WindowsIdentity.GetCurrent().IsSystem,SessionId=Process.GetCurrentProcess().SessionId,DeveloperMode=Program.DeveloperModeEnabled};
         ServiceFiles.Log($"Service started: SYSTEM={state.SystemAccount}; session={state.SessionId}; developerMode={state.DeveloperMode}.");
-        PhysicalHideLease? retainedHiding=null;
+        // The owned hiding rule stays while the bridge is on, including while it waits,
+        // so a controller that turns on is already hidden from other applications.
+        PhysicalHideLease? hiding=null;
+        var gate=new ConnectionGate();
+        string lastError="";
         try {
             var config=ServiceFiles.Configuration();
             _=new SecurityIdentifier(config.OwnerSid);
             PhysicalHideLease.Recover();
             while(!stop.IsCancellationRequested) {
-                await using var session=new BridgeSession();
-                session.Log+=ServiceFiles.Log;
-                PhysicalHideLease? hiding=retainedHiding;retainedHiding=null;
+                state.Connected=state.TelemetryFresh=state.VirtualController=false;state.Battery=null;state.Charging=false;
                 try {
-                    state.Phase="Waiting for the GameSir G7 Pro";state.Connected=state.TelemetryFresh=state.VirtualController=false;
-                    state.Attention="";
-                    ServiceFiles.Publish(state);
                     if(!config.InputOnly) {
                         try {
                             PhysicalHideLease.CheckAvailable();
@@ -117,65 +118,94 @@ internal sealed class ControllerService : ServiceBase
                     if(Process.GetProcessesByName("HJC.GameSir.Nexus2_0").Length!=0) {
                         state.Phase="Close GameSir Nexus to use the bridge";state.Attention="close-nexus";ServiceFiles.Publish(state);await Task.Delay(2000,stop);continue;
                     }
-                    var devices=GameInputTransport.Enumerate().Where(d=>d.ProductId is 0x100A or 0x106B).ToArray();
-                    if(devices.Length!=1 || (config.PreferredLocation.Length!=0 && devices[0].PhysicalKey!=config.PreferredLocation)) {
-                        if(devices.Length>1){state.Phase="More than one GameSir found; no device selected automatically";state.Attention="multiple-controllers";}
-                        ServiceFiles.Publish(state);await Task.Delay(2000,stop);continue;
+                    // Read-only Plug and Play check: nothing is opened while the controller is off.
+                    var receivers=ReceiverScanner.Scan().Where(r=>config.PreferredLocation.Length==0 || r.Location==config.PreferredLocation).ToArray();
+                    var action=gate.Next(receivers.Length==1 && receivers[0].ControllerPresent);
+                    if(receivers.Length==1) {
+                        state.Location=receivers[0].Location;
+                        if(!config.InputOnly && gate.HoldHiding)hiding??=PhysicalHideLease.BeforeConnection(receivers[0].Location);
                     }
-                    var device=devices[0];state.Location=device.PhysicalKey;
-                    if(!config.InputOnly)hiding??=PhysicalHideLease.BeforeConnection(device.PhysicalKey);
-                    session.Start(device);bool requested=false;var started=Stopwatch.StartNew();
-                    long nextOutputAttempt=0;string outputError="";
-                    while(session.IsRunning && !stop.IsCancellationRequested) {
-                        var s=session.Status;
-                        if(s.Connected && !requested && device.ProductId==0x100A) {session.RequestGyro();requested=true;}
-                        state.Phase=s.Phase;state.Connected=s.Connected;state.TelemetryFresh=s.Input.HasTelemetry;
-                        state.TelemetryPackets=s.TelemetryPackets;state.VirtualController=s.SteamActive;
-                        state.OutputReports=session.OutputReports;state.OutputReport=session.LastOutputReport;
-                        state.Battery=s.Telemetry?.Battery;state.FullResolutionAxes=s.Input.HasGamepad;
-                        state.FeedbackPackets=s.Haptics;state.RumbleUpdates=session.RumbleUpdates;
-                        state.SourceReport=s.Telemetry is null?"":Convert.ToHexString(s.Telemetry.Report);
-                        state.Buttons=s.Input.Pad.Buttons.ToString();
-                        var p=s.Input.Pad;state.Axes=$"L {p.LX},{p.LY} R {p.RX},{p.RY} T {p.LT},{p.RT}";
-                        var m=s.Telemetry;state.Motion=m is null?"":$"G {m.GX},{m.GY},{m.GZ} A {m.AX},{m.AY},{m.AZ}";
-                        if(s.Input.HasTelemetry) {
-                            if(config.InputOnly)state.Phase="Background input active (service probe)";
-                            else if(s.SteamActive)state.Phase="Active — GameSir to Steam Controller";
-                            else if(started.ElapsedMilliseconds>=nextOutputAttempt) {
-                                nextOutputAttempt=started.ElapsedMilliseconds+15000;
-                                state.Phase="Connecting virtual Steam Controller";ServiceFiles.Publish(state);
-                                try {
-                                    if(hiding is null) {
-                                        hiding=new PhysicalHideLease(session.NativeInstanceId,device.PhysicalKey);
-                                        // First pairing: close and reopen once with the complete hide list
-                                        // already active, so applications cannot keep an earlier XInput handle.
-                                        retainedHiding=hiding;hiding=null;
-                                        state.Phase="First pairing; closing previous physical input connection";
-                                        ServiceFiles.Log(state.Phase);ServiceFiles.Publish(state);break;
-                                    }
-                                    if(!string.Equals(hiding.Root,session.NativeInstanceId,StringComparison.OrdinalIgnoreCase))throw new IOException("The paired controller instance changed.");
-                                    state.HiddenInstance=session.NativeInstanceId;
-                                    await Task.Run(()=>session.StartSteam(physicalInputHidden:true),stop);
-                                    outputError="";state.Attention="";
-                                } catch(Exception ex) {
-                                    outputError="Virtual output: "+ex.Message;state.Attention="output";ServiceFiles.Log(outputError);
-                                    hiding?.Dispose();hiding=null;state.HiddenInstance="";
+                    if(action!=GateAction.Start) {
+                        state.Attention=receivers.Length>1?"multiple-controllers":gate.Released?"connection":"";
+                        state.Phase=receivers.Length>1?"More than one GameSir found; no device selected automatically":
+                            gate.Released?"Connection failed three times; the physical controller works normally until it reconnects":"Waiting for the GameSir G7 Pro";
+                        ServiceFiles.Publish(state);await Task.Delay(500,stop);continue;
+                    }
+                    var devices=GameInputTransport.Enumerate().Where(d=>d.ProductId is 0x100A or 0x106B && d.PhysicalKey==receivers[0].Location).ToArray();
+                    if(devices.Length!=1) {
+                        state.Phase="Waiting for Windows to report the GameSir G7 Pro";state.Attention="";
+                        ServiceFiles.Publish(state);await Task.Delay(500,stop);continue;
+                    }
+                    var device=devices[0];state.Attention="";
+                    bool received=false;
+                    try {
+                        await using var session=new BridgeSession();
+                        session.Log+=ServiceFiles.Log;
+                        try {
+                            session.Start(device);bool requested=false;var started=Stopwatch.StartNew();
+                            long nextOutputAttempt=0;string outputError="";
+                            while(session.IsRunning && !stop.IsCancellationRequested) {
+                                var s=session.Status;
+                                if(s.TelemetryPackets>0)received=true;
+                                if(s.Connected && !requested && device.ProductId==0x100A) {session.RequestGyro();requested=true;}
+                                state.Phase=s.Phase;state.Connected=s.Connected;state.TelemetryFresh=s.Input.HasTelemetry;
+                                state.TelemetryPackets=s.TelemetryPackets;state.VirtualController=s.SteamActive;
+                                state.OutputReports=session.OutputReports;state.OutputReport=session.LastOutputReport;
+                                state.Battery=s.Telemetry?.Battery;state.Charging=s.Telemetry?.Charging??false;state.FullResolutionAxes=s.Input.HasGamepad;
+                                state.FeedbackPackets=s.Haptics;state.RumbleUpdates=session.RumbleUpdates;
+                                state.SourceReport=s.Telemetry is null?"":Convert.ToHexString(s.Telemetry.Report);
+                                state.Buttons=s.Input.Pad.Buttons.ToString();
+                                var p=s.Input.Pad;state.Axes=$"L {p.LX},{p.LY} R {p.RX},{p.RY} T {p.LT},{p.RT}";
+                                var m=s.Telemetry;state.Motion=m is null?"":$"G {m.GX},{m.GY},{m.GZ} A {m.AX},{m.AY},{m.AZ}";
+                                if(s.Input.HasTelemetry) {
+                                    if(config.InputOnly)state.Phase="Background input active (service probe)";
+                                    else if(s.SteamActive)state.Phase="Active — GameSir to Steam Controller";
+                                    else if(started.ElapsedMilliseconds>=nextOutputAttempt) {
+                                        nextOutputAttempt=started.ElapsedMilliseconds+15000;
+                                        state.Phase="Connecting virtual Steam Controller";ServiceFiles.Publish(state);
+                                        try {
+                                            if(hiding is null) {
+                                                hiding=new PhysicalHideLease(session.NativeInstanceId,device.PhysicalKey);
+                                                // First pairing: close and reopen once with the complete hide list
+                                                // already active, so applications cannot keep an earlier XInput handle.
+                                                state.Phase="First pairing; closing previous physical input connection";
+                                                ServiceFiles.Log(state.Phase);ServiceFiles.Publish(state);break;
+                                            }
+                                            if(!string.Equals(hiding.Root,session.NativeInstanceId,StringComparison.OrdinalIgnoreCase))throw new IOException("The paired controller instance changed.");
+                                            state.HiddenInstance=session.NativeInstanceId;
+                                            await Task.Run(()=>session.StartSteam(physicalInputHidden:true),stop);
+                                            outputError="";state.Attention="";
+                                        } catch(Exception ex) {
+                                            outputError="Virtual output: "+ex.Message;state.Attention="output";ServiceFiles.Log(outputError);
+                                            hiding?.Dispose();hiding=null;state.HiddenInstance="";
+                                        }
+                                    } else if(outputError.Length!=0)state.Phase=outputError;
                                 }
-                            } else if(outputError.Length!=0)state.Phase=outputError;
+                                ServiceFiles.Publish(state);
+                                if(started.Elapsed>TimeSpan.FromSeconds(45) && s.TelemetryPackets==0)throw new IOException("No GameSir telemetry within 45 seconds.");
+                                await Task.Delay(100,stop);
+                            }
+                        } finally {await session.StopAsync();state.HiddenInstance="";}
+                    } finally {
+                        if(!stop.IsCancellationRequested && gate.SessionEnded(received)==GateAction.Release) {
+                            hiding?.Dispose();hiding=null;
+                            ServiceFiles.Log($"Connection failed {ConnectionGate.MaximumFailures} times with the controller present; the physical controller is released until it reconnects.");
                         }
-                        ServiceFiles.Publish(state);
-                        if(started.Elapsed>TimeSpan.FromSeconds(45) && s.TelemetryPackets==0)throw new IOException("No GameSir telemetry within 45 seconds.");
-                        await Task.Delay(100,stop);
                     }
+                    if(received)lastError="";
+                    await Task.Delay(2000,stop);
                 } catch(OperationCanceledException) when(stop.IsCancellationRequested) {break;}
-                catch(Exception ex) {state.Phase=ex.Message;ServiceFiles.Log("Connection: "+ex.Message);ServiceFiles.Publish(state);}
-                finally {await session.StopAsync();hiding?.Dispose();state.HiddenInstance="";}
-                if(!stop.IsCancellationRequested)await Task.Delay(2000,stop);
+                catch(Exception ex) {
+                    state.Phase=ex.Message;
+                    // A repeated identical failure is logged once, not on every attempt.
+                    if(ex.Message!=lastError){lastError=ex.Message;ServiceFiles.Log("Connection: "+ex.Message);}
+                    ServiceFiles.Publish(state);await Task.Delay(2000,stop);
+                }
             }
         } catch(OperationCanceledException) when(stop.IsCancellationRequested) { }
         catch(Exception ex) {ServiceFiles.Log("Service error: "+ex);}
         finally {
-            retainedHiding?.Dispose();
+            hiding?.Dispose();
             state.Phase="Stopped";state.Connected=state.TelemetryFresh=state.VirtualController=false;
             state.Attention="";
             ServiceFiles.Log("Service stopped; owned controller session closed.");ServiceFiles.Publish(state);
