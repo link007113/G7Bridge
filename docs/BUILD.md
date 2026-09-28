@@ -42,7 +42,8 @@ Trigger sourcing: GameSir E0 report bytes 59/60 provide the physical 8-bit LT/RT
 
 Waiting and pacing:
 - `ReceiverScanner` reads present devices through cfgmgr32. A supported receiver root is `USB\VID_3537&PID_100A|106B`, and a connected controller is a present descendant with `&IG_`. The scan opens no device.
-- `ConnectionGate` decides between waiting, starting and releasing the hiding rule after three failed sessions.
+- `ConnectionGate` decides between waiting, starting and releasing the hiding rule after three failed sessions. A present controller that GameInput does not report within ten seconds counts as a failed session. Failures on the 100A identity never release, because the paired rule only covers 106B children.
+- Nexus, a driver problem or several receivers release the rule while they last, and a failed release is retried.
 - During an input session, `TimerResolution` requests 1 ms timer resolution for the service process. Without it, short waits since Windows 10 2004 take the default ~15.6 ms tick.
 
 The app accepts `--tray` for its per-user `Run` entry: it starts without a window and never triggers setup elevation by itself. `Autostart` only registers the installed Program Files executable. The first run of a version with this feature enables it once, and afterwards only the user's choice counts. Tray icons are drawn at runtime as in-memory PNG ICO files. `--render-ui` also writes a `-tray.png` sheet with every icon state.

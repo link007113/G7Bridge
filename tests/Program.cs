@@ -19,7 +19,35 @@ var tests = new (string Name, Action Body)[] {
     ("Always-present 100A interfaces do not count as a connected controller",()=>{
         True(!ReceiverPresence.HasController([@"USB\VID_3537&PID_100A&MI_00\8&31B07931&0&0000",@"USB\VID_3537&PID_100A&MI_01\8&31B07931&0&0001",
             @"HID\VID_3537&PID_100A&MI_01&COL01\9&1DB5C6EA&0&0000",@"HID\VID_3537&PID_100A&MI_01&COL04\9&1DB5C6EA&0&0003"]));
-        True(ReceiverPresence.HasController([@"USB\VID_3537&PID_100A&MI_00\8&31B07931&0&0000",@"USB\VID_3537&PID_100A&IG_00\9&5F23AA5&0&00"]));
+        // Recorded by Windows on the development PC in the 100A window of 2026-09-28 18:32:53-18:33:02, controller on.
+        True(ReceiverPresence.HasController([@"USB\VID_3537&PID_100A&MI_00\8&31B07931&0&0000",@"USB\VID_3537&PID_100A&IG_02\9&5F23AA5&0&02",@"HID\VID_3537&PID_100A&IG_02\A&2EE197D2&0&0000"]));
+    }),
+    ("Only the 106B session receiver has hideable paired controller children",()=>{
+        True(ReceiverPresence.IsSessionRoot(@"USB\VID_3537&PID_106B\0000DF3F3CCA6347"));
+        True(!ReceiverPresence.IsSessionRoot(@"USB\VID_3537&PID_100A\00CC848C41"));
+    }),
+    ("A present controller that Windows does not report within ten seconds counts as a failed session",()=>{
+        var gate=new ConnectionGate();
+        Equal(GateAction.Start,gate.Next(true,0));
+        Equal(GateAction.Wait,gate.NotReported(9_999,hidingApplies:true));Equal(GateAction.Wait,gate.NotReported(10_000,true));
+        Equal(GateAction.Wait,gate.NotReported(19_999,true));Equal(GateAction.Wait,gate.NotReported(20_000,true));True(gate.HoldHiding);
+        Equal(GateAction.Wait,gate.NotReported(29_999,true));Equal(GateAction.Release,gate.NotReported(30_000,true));True(!gate.HoldHiding);
+    }),
+    ("A controller turned on again gets a fresh grace period",()=>{
+        var gate=new ConnectionGate();
+        Equal(GateAction.Start,gate.Next(true,0));Equal(GateAction.Wait,gate.NotReported(10_000,true));
+        Equal(GateAction.Wait,gate.Next(false,11_000));Equal(GateAction.Start,gate.Next(true,50_000));
+        Equal(GateAction.Wait,gate.NotReported(59_999,true));
+        // Only failures after the re-arm count: the in-grace report above must not be one of them.
+        Equal(GateAction.Start,gate.Next(true,60_000));Equal(GateAction.Wait,gate.SessionEnded(false));
+        Equal(GateAction.Start,gate.Next(true,61_000));Equal(GateAction.Wait,gate.SessionEnded(false));
+        Equal(GateAction.Start,gate.Next(true,62_000));Equal(GateAction.Release,gate.SessionEnded(false));
+    }),
+    ("Failures on the 100A identity never release hiding because it does not apply there",()=>{
+        var gate=new ConnectionGate();
+        for(int i=0;i<6;i++){Equal(GateAction.Start,gate.Next(true,i*60_000L));Equal(GateAction.Wait,gate.SessionEnded(false,hidingApplies:false));}
+        for(long t=400_000;t<500_000;t+=10_000)Equal(GateAction.Wait,gate.NotReported(t,false));
+        True(gate.HoldHiding);True(!gate.Released);Equal(GateAction.Start,gate.Next(true,500_000));
     }),
     ("Waiting for an absent controller keeps hiding and never starts a session",()=>{
         var gate=new ConnectionGate();

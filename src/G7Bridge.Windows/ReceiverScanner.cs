@@ -22,12 +22,13 @@ internal static class ReceiverScanner
     [DllImport("cfgmgr32.dll",CharSet=CharSet.Unicode)] private static extern int CM_Get_Device_IDW(uint node,StringBuilder id,int length,uint flags);
     [DllImport("cfgmgr32.dll",CharSet=CharSet.Unicode)] private static extern int CM_Get_DevNode_PropertyW(uint node,in DevPropKey key,out uint type,[Out] byte[]? buffer,ref uint size,uint flags);
 
-    internal static Receiver[] Scan()
+    // Null when Windows could not return the device list; callers retry instead of treating it as empty.
+    internal static Receiver[]? Scan()
     {
         // A device arriving between both calls makes the list larger; the next scan retries.
-        if(CM_Get_Device_ID_List_SizeW(out uint length,"USB",FilterEnumerator|FilterPresent)!=0)return [];
+        if(CM_Get_Device_ID_List_SizeW(out uint length,"USB",FilterEnumerator|FilterPresent)!=0)return null;
         var buffer=new char[length];
-        if(CM_Get_Device_ID_ListW("USB",buffer,length,FilterEnumerator|FilterPresent)!=0)return [];
+        if(CM_Get_Device_ID_ListW("USB",buffer,length,FilterEnumerator|FilterPresent)!=0)return null;
         var found=new List<Receiver>();
         foreach(var id in new string(buffer).Split('\0',StringSplitOptions.RemoveEmptyEntries).Where(ReceiverPresence.IsReceiverRoot)) {
             if(CM_Locate_DevNodeW(out uint node,id,0)!=0)continue;

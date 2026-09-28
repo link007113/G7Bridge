@@ -28,11 +28,13 @@ These observations were read-only, on the development PC with the 106B receiver:
 - Controller off: the receiver root has no child devices, and the paired 045E:02FF legacy instances are not present. The 1.2 service meanwhile repeated a hide / open (`0x80070490`) / unhide cycle about every six seconds.
 - Controller on: the `USB\VID_045E&PID_02FF&IG_00` child and its HID grandchild are present.
 
-1.3 therefore opens a session only when such an `&IG_` descendant exists. It keeps its own hiding rule while waiting. After three failed sessions with the controller present, it releases the physical controller until the controller disconnects.
+1.3 therefore opens a session only when such an `&IG_` descendant exists, and keeps its own hiding rule while waiting. With the controller present, three failed sessions release the physical controller until it disconnects. A controller that Windows' input API does not report within ten seconds counts as a failed session, as does an enumeration error.
+
+In the 100A window of 2026-09-28 18:32:53–18:33:02 (controller on, switched to 106B by the running service), Windows recorded `USB\VID_3537&PID_100A&IG_02` and its HID child. Earlier 100A `&IG_` instances were present for long periods, so they may also exist with the controller off. For that reason failures on the 100A identity never release hiding: the paired rule only lists the 106B children, so it has no effect there. The service keeps retrying, as 1.2 did.
 
 Before 1.3, the active service delivered 62.6 telemetry and 127 virtual reports per second. Without a fine-grained timer request, its intended 8 ms pad poll and 4 ms idle wait were rounded up to the default Windows tick of about 15.6 ms. 1.3 requests 1 ms resolution for the service process only during an input session. It also waits 1 ms when the queue is empty.
 
-Offline tests cover receiver/child classification (including 100A interfaces that exist without a controller), the wait/start/release state machine, battery alert thresholds, hysteresis and charging, autostart registry state, and tray status text. The 100A receiver mode, sign-in start after a Windows restart, the notifications themselves and the output-rate improvement require checks on real hardware.
+Offline tests cover receiver/child classification (including 100A interfaces that exist without a controller), the wait/start/release state machine including the report grace period and 100A behaviour, battery alert thresholds, hysteresis and charging, parsing of the autostart command and StartupApproved value, and tray status text. The 100A receiver mode, sign-in start after a Windows restart, the notifications themselves and the output-rate improvement require checks on real hardware.
 
 ## Manual acceptance checklist
 

@@ -155,11 +155,12 @@ internal sealed class ServiceForm : Form
         }
         if(batteryAlerts.Observe(current?last!.Battery:null,current && last!.Charging) is not null && last?.Battery is byte battery)
             Notify(L.Text($"Controller battery at {battery}%",$"Accu van de controller op {battery}%"),L.Text("Charge the G7 Pro soon.","Laad de G7 Pro binnenkort op."),ToolTipIcon.Warning);
-        // Only a cause that persists for five seconds is announced, once, while the window is hidden.
+        // A cause that persists for five seconds is announced once while the window is hidden,
+        // and not again until the bridge has worked; retry cycles briefly clear the service's cause.
         string attention=view.Kind==TrayKind.Attention?lastProblem??last?.Attention??"":"";
         if(attention!=pendingAttention){pendingAttention=attention;attentionSince=Environment.TickCount64;}
-        if(attention.Length==0)notifiedAttention="";
-        else if(attention!=notifiedAttention && !Visible && Environment.TickCount64-attentionSince>=5000) {
+        if(Ready)notifiedAttention="";
+        else if(attention.Length!=0 && attention!=notifiedAttention && !Visible && Environment.TickCount64-attentionSince>=5000) {
             notifiedAttention=attention;
             Notify(L.Text("G7 Bridge needs attention","G7 Bridge heeft aandacht nodig"),details.Text,ToolTipIcon.Warning);
         }
@@ -176,6 +177,8 @@ internal sealed class ServiceForm : Form
             bool enabled=Autostart.Enabled;
             autostart.Checked=autostartItem.Checked=enabled;
             autostart.Enabled=autostartItem.Enabled=Autostart.Available;
+        } catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) {
+            autostart.Enabled=autostartItem.Enabled=false;
         } finally {syncingAutostart=false;}
     }
     private void SetAutostart(bool enabled)

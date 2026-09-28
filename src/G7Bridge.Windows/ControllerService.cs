@@ -102,41 +102,65 @@ internal sealed class ControllerService : ServiceBase
         PhysicalHideLease? hiding=null;
         var gate=new ConnectionGate();
         string lastError="";
+        // Nexus, a driver problem or several receivers pause the bridge, so the physical
+        // controller is released then. A failed release is retried on the next pass.
+        void ReleaseHiding()
+        {
+            if(hiding is null)return;
+            try {hiding.Dispose();hiding=null;}
+            catch(Exception ex) {if(ex.Message!=lastError){lastError=ex.Message;ServiceFiles.Log("Releasing the hiding rule failed; retrying: "+ex.Message);}}
+        }
+        void Ended(GateAction result)
+        {
+            if(result!=GateAction.Release)return;
+            ServiceFiles.Log($"Connection failed {ConnectionGate.MaximumFailures} times with the controller present; the physical controller is released until it reconnects.");
+            ReleaseHiding();
+        }
         try {
             var config=ServiceFiles.Configuration();
             _=new SecurityIdentifier(config.OwnerSid);
             PhysicalHideLease.Recover();
             while(!stop.IsCancellationRequested) {
-                state.Connected=state.TelemetryFresh=state.VirtualController=false;state.Battery=null;state.Charging=false;
+                state.Connected=state.TelemetryFresh=state.VirtualController=false;state.Battery=null;state.Charging=false;state.Attention="";
                 try {
                     if(!config.InputOnly) {
                         try {
                             PhysicalHideLease.CheckAvailable();
                             if(!HIDMaestro.HMContext.IsUsbipBackendAvailable)throw new IOException("The virtual USB driver is missing. Complete G7 Bridge setup.");
-                        } catch(Exception ex) {state.Phase=ex.Message;state.Attention="driver";ServiceFiles.Publish(state);await Task.Delay(5000,stop);continue;}
+                        } catch(Exception ex) {ReleaseHiding();state.Phase=ex.Message;state.Attention="driver";ServiceFiles.Publish(state);await Task.Delay(2000,stop);continue;}
                     }
                     if(Process.GetProcessesByName("HJC.GameSir.Nexus2_0").Length!=0) {
-                        state.Phase="Close GameSir Nexus to use the bridge";state.Attention="close-nexus";ServiceFiles.Publish(state);await Task.Delay(2000,stop);continue;
+                        ReleaseHiding();state.Phase="Close GameSir Nexus to use the bridge";state.Attention="close-nexus";ServiceFiles.Publish(state);await Task.Delay(2000,stop);continue;
                     }
-                    // Read-only Plug and Play check: nothing is opened while the controller is off.
-                    var receivers=ReceiverScanner.Scan().Where(r=>config.PreferredLocation.Length==0 || r.Location==config.PreferredLocation).ToArray();
-                    var action=gate.Next(receivers.Length==1 && receivers[0].ControllerPresent);
-                    if(receivers.Length==1) {
-                        state.Location=receivers[0].Location;
-                        if(!config.InputOnly && gate.HoldHiding)hiding??=PhysicalHideLease.BeforeConnection(receivers[0].Location);
+                    // Read-only Plug and Play check: the controller is not opened while it is off.
+                    // An unreadable device list is skipped, not mistaken for an absent controller.
+                    if(ReceiverScanner.Scan() is not { } scanned){await Task.Delay(500,stop);continue;}
+                    var receivers=scanned.Where(r=>config.PreferredLocation.Length==0 || r.Location==config.PreferredLocation).ToArray();
+                    if(receivers.Length>1) {
+                        ReleaseHiding();state.Attention="multiple-controllers";state.Phase="More than one GameSir found; no device selected automatically";
+                        ServiceFiles.Publish(state);await Task.Delay(500,stop);continue;
                     }
+                    bool present=receivers.Length==1 && receivers[0].ControllerPresent;
+                    var action=gate.Next(present,Environment.TickCount64);
+                    if(!present)lastError="";
+                    if(receivers.Length==1)state.Location=receivers[0].Location;
+                    if(!gate.HoldHiding)ReleaseHiding();
+                    else if(receivers.Length==1 && !config.InputOnly)hiding??=PhysicalHideLease.BeforeConnection(receivers[0].Location);
                     if(action!=GateAction.Start) {
-                        state.Attention=receivers.Length>1?"multiple-controllers":gate.Released?"connection":"";
-                        state.Phase=receivers.Length>1?"More than one GameSir found; no device selected automatically":
-                            gate.Released?"Connection failed three times; the physical controller works normally until it reconnects":"Waiting for the GameSir G7 Pro";
+                        state.Attention=gate.Released?"connection":"";
+                        state.Phase=gate.Released?"Connection failed three times; the physical controller works normally until it reconnects":"Waiting for the GameSir G7 Pro";
                         ServiceFiles.Publish(state);await Task.Delay(500,stop);continue;
                     }
-                    var devices=GameInputTransport.Enumerate().Where(d=>d.ProductId is 0x100A or 0x106B && d.PhysicalKey==receivers[0].Location).ToArray();
+                    bool hidingApplies=ReceiverPresence.IsSessionRoot(receivers[0].InstanceId);
+                    ControllerDevice[] devices;
+                    try {devices=GameInputTransport.Enumerate().Where(d=>d.ProductId is 0x100A or 0x106B && d.PhysicalKey==receivers[0].Location).ToArray();}
+                    catch(Exception) {Ended(gate.SessionEnded(false,hidingApplies));throw;}
                     if(devices.Length!=1) {
-                        state.Phase="Waiting for Windows to report the GameSir G7 Pro";state.Attention="";
+                        Ended(gate.NotReported(Environment.TickCount64,hidingApplies));
+                        state.Phase="Waiting for Windows to report the GameSir G7 Pro";
                         ServiceFiles.Publish(state);await Task.Delay(500,stop);continue;
                     }
-                    var device=devices[0];state.Attention="";
+                    var device=devices[0];
                     bool received=false;
                     try {
                         await using var session=new BridgeSession();
@@ -187,10 +211,7 @@ internal sealed class ControllerService : ServiceBase
                             }
                         } finally {await session.StopAsync();state.HiddenInstance="";}
                     } finally {
-                        if(!stop.IsCancellationRequested && gate.SessionEnded(received)==GateAction.Release) {
-                            hiding?.Dispose();hiding=null;
-                            ServiceFiles.Log($"Connection failed {ConnectionGate.MaximumFailures} times with the controller present; the physical controller is released until it reconnects.");
-                        }
+                        if(!stop.IsCancellationRequested)Ended(gate.SessionEnded(received,hidingApplies));
                     }
                     if(received)lastError="";
                     await Task.Delay(2000,stop);

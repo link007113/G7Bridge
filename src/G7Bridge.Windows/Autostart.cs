@@ -45,7 +45,7 @@ internal static class Autostart
             preferences.AutostartInitialized=true;
             Directory.CreateDirectory(SettingsStore.DirectoryPath);
             File.WriteAllText(PreferencesPath,JsonSerializer.Serialize(preferences));
-        } catch(IOException) { } catch(UnauthorizedAccessException) { } catch(JsonException) { }
+        } catch(IOException) { } catch(UnauthorizedAccessException) { } catch(JsonException) { } catch(System.Security.SecurityException) { }
     }
     private static string L(string english,string dutch)=>UiLanguage.Text(english,dutch);
 }
