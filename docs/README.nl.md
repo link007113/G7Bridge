@@ -6,7 +6,7 @@ Gebruik je **GameSir G7 Pro via de 2,4GHz-ontvanger** als virtuele Steam Control
 
 ## Installeren
 
-1. Download **`G7Bridge-1.3.0-rc.1-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
+1. Download **`G7Bridge-1.3.0-rc.2-Setup-x64.exe`** bij Releases. De broncodezip hoef je niet te downloaden.
 2. Sluit een eventueel geopende G7 Bridge en voer de installer uit. Bevestig de Windows-beheerdersvraag en lees en accepteer de voorwaarden van het meegeleverde Microsoft GameInput-onderdeel. De app, .NET-runtime, dienst en benodigde drivers zitten in dit bestand. USB-apparaten kunnen bij de eerste driverinstallatie kort opnieuw verbinden. Herstart Windows als de installer daarom vraagt.
 3. Sluit GameSir Nexus, steek de 2,4GHz-ontvanger in en zet de controller aan.
 4. Open **G7 Bridge** via Start of de bureaubladsnelkoppeling. Zodra de verbinding gereed is, gaat het venster naar het systeemvak.
@@ -21,7 +21,7 @@ De eigen installer heeft nog geen codeondertekening. Windows kan daarom een meld
 ## Functies
 
 - Gewone knoppen, sticks en triggers worden doorgegeven. Sticks behouden de Windows/GIP-resolutie; triggers gebruiken de fysieke analoge GameSir-stand met 256 stappen.
-- **L4, R4, L5 en R5** zijn vier onafhankelijke gripknoppen in Steam Input.
+- **L4/R4** zijn de extra achterknoppen; **L5/R5** de extra schouderknoppen. In Steam Input zijn het vier onafhankelijke gripknoppen. **L3/R3** zijn de stickklikken.
 - **Share** wordt een aparte Quick Access-invoer. Koppel daar in Steam Input de screenshotactie aan.
 - **Gyro, accelerometer, relatieve oriëntatie en accupercentage** worden doorgegeven. De accu staat ook in het systeemvak, met een melding bij 20% en 10%.
 - **Gewone rumble op de twee hoofdmotoren** werkt via de Windows-gamepad-API, inclusief stoppen. Triggermotoren en speciale Steam-trackpadhaptiek worden nog niet aangestuurd.
@@ -71,7 +71,7 @@ Kies **Diagnose opslaan** bij een foutmelding. De export bevat onder meer appara
 
 ## Status van deze release
 
-**1.3.0-rc.1 is een preview.** De bestaande bridge is met een echte G7 Pro gemeten. De nieuwe installer, upgrade- en verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Er zijn offline unittests en builds uitgevoerd; dat vervangt die installatieproef niet. Zie [de precieze validatiestatus](VALIDATION.md).
+**1.3.0-rc.2 is een preview**, met HIDMaestro 2.0.2. De bridge en de upgrade van een bestaande installatie zijn met een echte G7 Pro gecontroleerd. Een schone installatie en de verwijderprocedure moeten nog handmatig op een schone Windows-installatie worden beoordeeld. Zie [de precieze validatiestatus](VALIDATION.md).
 
 [Broncode bouwen](BUILD.md) · [Onderdelen en licenties](../DEPENDENCIES.md)
 

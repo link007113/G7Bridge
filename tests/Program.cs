@@ -4,6 +4,15 @@ using System.Globalization;
 
 UiLanguage.Initialize(CultureInfo.InvariantCulture);
 var tests = new (string Name, Action Body)[] {
+    ("A button watcher arms on release before accepting a new press and release, also after reconnect",()=>{
+        var cycle=new G7Bridge.Validation.ButtonCycle();
+        True(!cycle.Accept(true));True(!cycle.Accept(true));True(!cycle.PressSeen);
+        True(!cycle.Accept(false));True(!cycle.PressSeen);
+        True(!cycle.Accept(true));True(cycle.PressSeen);True(cycle.Accept(false));
+        var reconnected=new G7Bridge.Validation.ButtonCycle();
+        True(!reconnected.Accept(true));True(!reconnected.Accept(false));True(!reconnected.PressSeen);
+        True(!reconnected.Accept(true));True(reconnected.Accept(false));
+    }),
     ("Only the USB root of a supported GameSir receiver is selectable",()=>{
         True(ReceiverPresence.IsReceiverRoot(@"USB\VID_3537&PID_106B\0000DF3F3CCA6347"));
         True(ReceiverPresence.IsReceiverRoot(@"usb\vid_3537&pid_100a\00CC848C41"));
@@ -268,17 +277,53 @@ var tests = new (string Name, Action Body)[] {
             System.Globalization.CultureInfo.CurrentUICulture=oldUi;
         }
     }),
-    ("Raw bridge streaming disables the SDK generator that would inject empty input frames",()=>{
-        const string json="{\"extendedReport\":{\"id\":66,\"size\":54,\"idleFrameIntervalMs\":4,\"alwaysArmed\":true}}";
+    ("Bridge-owned reports retain the fixed SDK idle repeat and deliver each input or battery submit",()=>{
+        const string json="{\"extendedReport\":{\"id\":66,\"size\":54,\"send\":\"clock\",\"idleFrameIntervalMs\":4,\"alwaysArmed\":true}}";
         using var doc=System.Text.Json.JsonDocument.Parse(TritonIdentity.UseBridgeOwnedStream(json));
-        var report=doc.RootElement.GetProperty("extendedReport");Equal(0,report.GetProperty("idleFrameIntervalMs").GetInt32());
+        var report=doc.RootElement.GetProperty("extendedReport");Equal(4,report.GetProperty("idleFrameIntervalMs").GetInt32());
+        Equal("submit",report.GetProperty("send").GetString());
         Equal(54,report.GetProperty("size").GetInt32());True(report.GetProperty("alwaysArmed").GetBoolean());
+    }),
+    ("The 2.0.2 command-channel profile keeps existing Steam board and unit serials",()=>{
+        const string json="""
+        {"extendedReport":{"size":54,"send":"clock","idleFrameIntervalMs":4},"featureStubs":{"reports":[
+          {"id":"0x01","message":{"at":1,"value":"AE"},"param":{"at":3,"value":"00"},"data":"01ae14004d584139393630323030303031","patch":[{"at":4,"length":13,"encoding":"ascii","source":"instanceSerial"}]},
+          {"id":"0x01","message":{"at":1,"value":"AE"},"param":{"at":3,"value":"01"},"data":"01ae140146584139393630323030303031","patch":[{"at":4,"length":13,"encoding":"ascii","source":"instanceSerial"}]},
+          {"id":"0x01","message":{"at":1,"value":"83"},"data":"018319010213000002000000000a2ef9d2680457d0186a0948000000","patch":[{"source":"steamUpdater","at":19,"length":4,"key":"TRITON_FW_TS"}]}
+        ]}}
+        """;
+        using var doc=System.Text.Json.JsonDocument.Parse(TritonIdentity.UseBridgeOwnedStream(json));
+        var reports=doc.RootElement.GetProperty("featureStubs").GetProperty("reports");
+        Equal("01ae14004d584139393630323030303031",reports[0].GetProperty("data").GetString());
+        Equal("01ae140146584139393630323030303031",reports[1].GetProperty("data").GetString());
+        True(!reports[0].TryGetProperty("patch",out var boardPatches) || boardPatches.GetArrayLength()==0);
+        True(!reports[1].TryGetProperty("patch",out var unitPatches) || unitPatches.GetArrayLength()==0);
+        Equal("steamUpdater",reports[2].GetProperty("patch")[0].GetProperty("source").GetString());
+    }),
+    ("The 2.0.2 attributes match on the command byte and keep the firmware compatibility value",()=>{
+        const string json="""
+        {"featureStubs":{"reports":[{"id":"0x01","message":{"at":1,"value":"83"},"data":"018319010213000002000000000a2ef9d2680457d0186a0948000000"}]}}
+        """;
+        using var doc=System.Text.Json.JsonDocument.Parse(TritonIdentity.WithCompatibilityVersion(json,0x6ACFF323));
+        Equal("018319010213000002000000000A2EF9D2680423F3CF6A0948000000",doc.RootElement.GetProperty("featureStubs").GetProperty("reports")[0].GetProperty("data").GetString());
     }),
     ("Xbox Menu and View keep Start and Back semantics in the stock SDL Triton decoder",()=>{
         True(G7Protocol.TryGamepad(GameInputPackets.Gamepad(1,0,0,0,0,0,0),out var menu));
         True(G7Protocol.TryGamepad(GameInputPackets.Gamepad(2,0,0,0,0,0,0),out var view));
         Equal(0x40u,BinaryPrimitives.ReadUInt32LittleEndian(TritonProtocol.Encode(menu,default,0,0).AsSpan(2)));
         Equal(0x4000u,BinaryPrimitives.ReadUInt32LittleEndian(TritonProtocol.Encode(view,default,0,0).AsSpan(2)));
+    }),
+    ("The shipped upstream profile retains the USB layout and Steam identity after preparation",()=>{
+        using var stream=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("TritonProfile.json")!;
+        using var reader=new StreamReader(stream);
+        using var source=System.Text.Json.JsonDocument.Parse(reader.ReadToEnd());
+        using var result=System.Text.Json.JsonDocument.Parse(TritonIdentity.UseBridgeOwnedStream(TritonIdentity.WithCompatibilityVersion(source.RootElement.GetRawText(),0x6ACFF323)));
+        Equal(source.RootElement.GetProperty("descriptor").GetString(),result.RootElement.GetProperty("descriptor").GetString());
+        True(System.Text.Json.Nodes.JsonNode.DeepEquals(System.Text.Json.Nodes.JsonNode.Parse(source.RootElement.GetProperty("usbConfiguration").GetRawText()),System.Text.Json.Nodes.JsonNode.Parse(result.RootElement.GetProperty("usbConfiguration").GetRawText())));
+        Equal("0x28DE",result.RootElement.GetProperty("vid").GetString());Equal("0x1302",result.RootElement.GetProperty("pid").GetString());
+        Equal("submit",result.RootElement.GetProperty("extendedReport").GetProperty("send").GetString());
+        Equal(4,result.RootElement.GetProperty("extendedReport").GetProperty("idleFrameIntervalMs").GetInt32());
+        Equal("HM5AB6FC945E5A",VirtualControllerIdentity.UsbSerial);
     }),
     ("Virtual Steam identity updates only the compatibility timestamp and preserves other attributes",()=>{
         const string json="{\"featureStubs\":{\"reports\":[{\"id\":\"0x83\",\"data\":\"018319010213000002000000000a2ef9d2680457d0186a0948000000\"}]}}";
