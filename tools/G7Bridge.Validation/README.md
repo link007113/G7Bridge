@@ -27,9 +27,16 @@ For a separately authorized physical check, with the updated normal bridge activ
 # The user presses all buttons, gradually moves both analog triggers and rotates all three axes.
 # This command actuates the real motors once, at 25% strength for 400 ms, then sends zero:
 ./artifacts/validation/G7Bridge.Validation.exe --rumble
+# Optional diagnostic: left then right, one second each at 75%, with explicit stops.
+./artifacts/validation/G7Bridge.Validation.exe --rumble-motors
+# Wait up to 30 minutes for one real button press/release, reopening after sleep:
+./artifacts/validation/G7Bridge.Validation.exe --watch-button L4 "$PWD/artifacts/left-rear.json"
 ```
 
 Observation opens only the exact production USB serial/VID/PID/vendor collection.
+The duration can be up to 600 seconds. Creating `<json-path>.stop` ends the
+observation after its current read, so a user-operated sequence can finish without
+racing a short fixed window. Use a new output path for each sequence.
 It records missing buttons, partial trigger values, gyro ranges, quaternion
 validity and Steam's board/unit identity. A failed or incomplete physical sequence
 is a failed check, not hardware acceptance. `--rumble` confirms command delivery;

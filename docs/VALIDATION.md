@@ -20,8 +20,29 @@ serials and firmware attribute, and HID rumble writes reaching the SDK callback
 with both motor strengths plus an explicit stop. This test did not open or vibrate
 the physical G7. See `tools/G7Bridge.Validation` to reproduce it.
 
-Physical controller, Steam profile loading and actual motor acceptance for this
-update are recorded separately below when those checks have been performed.
+The in-place installer upgrade on the development PC completed with exit 0 and
+no reboot. The installed application/native/SDK binaries matched the candidate.
+With Developer Mode off, the LocalSystem service reconnected the real G7 Pro.
+
+User-operated physical sequences then confirmed all 20 buttons through Windows
+HID, including Share and the left rear L4 press and release. Both analog triggers
+covered 0 through 32767, including intermediate positions. Movement on all three
+gyro axes was recorded with no invalid quaternion in the observation captures.
+Short first captures were incomplete; a targeted button watcher that survives
+sleep/reconnection completed the remaining check. A partial capture alone was
+not counted as acceptance.
+
+Stock SDL 3.4.16 recognized the Steam Controller, enabled accelerometer and gyro,
+read changing motion, and exposed Share and all four extra button capabilities.
+The user confirmed each main motor at 75% for one second, left then right, with
+both stopping. The original 25%/400 ms test was not clearly felt; no motor scaling
+or physical-controller settings were changed.
+
+Steam's controller log showed the existing `configset_FXA9960200001.vdf` loading
+after reconnect. All 84 backed-up Steam Controller Configs files remained
+byte-identical after the input, sensor and rumble checks. Individual actions in
+every game were not exercised. Clean-install/uninstall and other-PC coverage
+remain preview limits.
 
 ## Existing 1.0 controller path
 

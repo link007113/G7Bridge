@@ -4,7 +4,7 @@
 
 **[Download the Windows installer](https://github.com/link007113/G7Bridge/releases)** · [Nederlandse handleiding](docs/README.nl.md) · [Report a problem](https://github.com/link007113/G7Bridge/issues)
 
-The current installer release is **1.3.0-rc.1 (preview)**. The underlying controller bridge has been exercised on a real G7 Pro. This new installer, upgrade and uninstall flow still needs manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
+The current installer release is **1.3.0-rc.2 (preview)**, using HIDMaestro 2.0.2. The bridge and in-place upgrade have been checked on a real G7 Pro. Clean installation and uninstall still need manual acceptance on a clean Windows installation. See [validation status](docs/VALIDATION.md) for the exact boundary.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ The current installer release is **1.3.0-rc.1 (preview)**. The underlying contro
 
 ## Install and play
 
-1. Download **`G7Bridge-1.3.0-rc.1-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
+1. Download **`G7Bridge-1.3.0-rc.2-Setup-x64.exe`** from [Releases](https://github.com/link007113/G7Bridge/releases). The GitHub source ZIP is for developers.
 2. Exit an older G7 Bridge instance, run the installer and accept the Windows elevation prompt and the bundled Microsoft GameInput terms. The installer includes the app, its .NET runtime and required controller drivers. USB devices may briefly reconnect during the first driver installation. Restart Windows if setup asks.
 3. Close GameSir Nexus, connect the 2.4 GHz receiver and turn on the controller.
 4. Open **G7 Bridge** from the Start menu or desktop shortcut. Once ready, the window moves to the system tray.
@@ -31,7 +31,7 @@ The setup executable is currently **unsigned**, so Windows may show an unknown-p
 | --- | --- |
 | Sticks, D-pad and normal buttons | Forwarded to the virtual controller; sticks retain the Windows/GIP values |
 | Analogue triggers | Physical GameSir telemetry positions, with 256 steps; avoids already clipped/profile-processed trigger values |
-| L4, R4, L5 and R5 | Four independent grip buttons, assignable in Steam Input |
+| L4/R4 (rear), L5/R5 (extra shoulders) | Four independent grip buttons, assignable in Steam Input |
 | Share / screenshot | An independent Quick Access input; assign the screenshot action in Steam Input |
 | Gyroscope and accelerometer | Motion data forwarded to Steam Input, with relative orientation |
 | Battery | Reported to the virtual controller, shown in the app and tray icon, with notifications at 20% and 10% |

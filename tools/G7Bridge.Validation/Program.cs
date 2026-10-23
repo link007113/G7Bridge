@@ -16,7 +16,9 @@ try {
     if(args is ["--sdk",var directory])await SdkTest(Path.GetFullPath(directory));
     else if(args is ["--observe",var seconds,var result])await Observe(int.Parse(seconds),result);
     else if(args is ["--rumble"])await PhysicalRumble();
-    else throw new ArgumentException("Use --sdk <scratch-directory>, --observe <seconds> <json>, or --rumble.");
+    else if(args is ["--rumble-motors"])await MotorProbe();
+    else if(args is ["--watch-button",var button,var destination])await WatchButton(button,destination);
+    else throw new ArgumentException("Use --sdk <scratch-directory>, --observe <seconds> <json>, --watch-button <name> <json>, --rumble or --rumble-motors.");
     return 0;
 } catch(Exception ex) {Console.Error.WriteLine(ex);return 1;}
 
@@ -94,14 +96,14 @@ static async Task SdkTest(string scratch)
 
 static async Task Observe(int seconds,string path)
 {
-    Require(seconds is >=5 and <=180,"Observation must be between 5 and 180 seconds.");
+    Require(seconds is >=5 and <=600,"Observation must be between 5 and 600 seconds.");
     using var device=await HidDevice.Find(0x28DE,0x1302,VirtualControllerIdentity.UsbSerial);
     var minimum=new int[]{32767,32767,32767};var maximum=new int[]{-32768,-32768,-32768};
     var timestamps=new HashSet<uint>();PadButtons buttons=0;int count=0,invalidQuaternion=0;
     int minLt=32767,maxLt=0,minRt=32767,maxRt=0;bool partialLt=false,partialRt=false;
     string board=Encoding.ASCII.GetString(device.Feature(0xAE,0),4,13),unit=Encoding.ASCII.GetString(device.Feature(0xAE,1),4,13);
     var clock=Stopwatch.StartNew();
-    while(clock.Elapsed.TotalSeconds<seconds) {
+    while(clock.Elapsed.TotalSeconds<seconds && !File.Exists(path+".stop")) {
         byte[] frame=await device.Read();if(frame[0]!=0x42)continue;
         count++;buttons|=(PadButtons)(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(2))&0xFFFFF);
         timestamps.Add(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(30)));
@@ -127,6 +129,59 @@ static async Task PhysicalRumble()
     using var device=await HidDevice.Find(0x28DE,0x1302,VirtualControllerIdentity.UsbSerial);
     await RumbleTest.RunAsync(async(strength,token)=>await device.Write(RumbleTest.Report(strength,device.OutputBytes),token),CancellationToken.None);
     Console.WriteLine("A bounded 400 ms pulse and an explicit neutral command were sent. Physical sensation requires user confirmation.");
+}
+
+static async Task MotorProbe()
+{
+    using var device=await HidDevice.Find(0x28DE,0x1302,VirtualControllerIdentity.UsbSerial);
+    foreach(bool left in new[]{true,false}) {
+        try {
+            var clock=Stopwatch.StartNew();
+            while(clock.ElapsedMilliseconds<1000) {
+                var report=RumbleTest.Report(0,device.OutputBytes);
+                BinaryPrimitives.WriteUInt16LittleEndian(report.AsSpan(left?4:7),0xC000);
+                using var timeout=new CancellationTokenSource(200);
+                await device.Write(report,timeout.Token);await Task.Delay(40);
+            }
+        } finally {
+            using var timeout=new CancellationTokenSource(200);
+            await device.Write(RumbleTest.Report(0,device.OutputBytes),timeout.Token);
+        }
+        await Task.Delay(500);
+    }
+    Console.WriteLine("Sent left then right: one second each at 75%, with explicit stops. Physical sensation requires user confirmation.");
+}
+
+static async Task WatchButton(string name,string path)
+{
+    var button=Enum.Parse<PadButtons>(name,true);uint mask=(uint)button;
+    Require(mask!=0 && (mask&(mask-1))==0 && (mask&0xFFFFF)==mask,"Choose one named controller button.");
+    var clock=Stopwatch.StartNew();
+    File.WriteAllText(path,JsonSerializer.Serialize(new{Button=button.ToString(),Completed=false,State="Waiting for the owned controller and button press"}));
+    while(clock.Elapsed.TotalMinutes<30) {
+        try {
+            using var device=await HidDevice.Find(0x28DE,0x1302,VirtualControllerIdentity.UsbSerial);
+            byte[]? pressed=null;
+            while(clock.Elapsed.TotalMinutes<30) {
+                byte[] frame=await device.Read();if(frame[0]!=0x42)continue;
+                bool down=(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(2))&mask)!=0;
+                if(down && pressed is null) {
+                    pressed=frame;
+                    File.WriteAllText(path,JsonSerializer.Serialize(new{Button=button.ToString(),Completed=false,State="Press observed; waiting for release",Press=Convert.ToHexString(pressed)}));
+                }
+                if(!down && pressed is not null) {
+                    var result=new{Button=button.ToString(),Completed=true,Seconds=clock.Elapsed.TotalSeconds,Press=Convert.ToHexString(pressed),Release=Convert.ToHexString(frame)};
+                    File.WriteAllText(path,JsonSerializer.Serialize(result,new JsonSerializerOptions{WriteIndented=true}));
+                    Console.WriteLine(JsonSerializer.Serialize(result));return;
+                }
+            }
+        } catch(Exception ex) when(ex is IOException or OperationCanceledException) {
+            // A press and release must belong to the same live connection.
+            File.WriteAllText(path,JsonSerializer.Serialize(new{Button=button.ToString(),Completed=false,State="Waiting for the owned controller to reconnect"}));
+            await Task.Delay(500);
+        }
+    }
+    throw new IOException("Button press/release not observed within 30 minutes.");
 }
 
 static string Serial(string key)=>"HM"+Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes("HIDMaestro.DeviceIdentity.v1\n"+key)).AsSpan(2,6));
