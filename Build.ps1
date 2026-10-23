@@ -8,6 +8,9 @@ try {
     if ($RunUnitTests) {
         dotnet run --project tests/G7Bridge.Tests.csproj -c Release
         if ($LASTEXITCODE -ne 0) { throw 'Unittests mislukt.' }
+        # Compile the explicitly invoked HID validation tool, without starting it.
+        dotnet build tools/G7Bridge.Validation/G7Bridge.Validation.csproj -c Release
+        if ($LASTEXITCODE -ne 0) { throw 'HID validation tool compilation failed.' }
     }
     $outputDirectory = Join-Path $projectRoot 'artifacts\package'
     # Always package a clean directory; old research notes must not leak into releases.

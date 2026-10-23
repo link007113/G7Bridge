@@ -4,12 +4,12 @@ G7 Bridge source is MIT licensed. Third-party components retain the licenses lis
 
 | Component | Version | Origin / license |
 | --- | --- | --- |
-| HIDMaestro.Core | 1.9.0 | [Official release](https://github.com/hifihedgehog/HIDMaestro/releases/tag/v1.9.0), MIT |
+| HIDMaestro.Core | 2.0.2 | [Official release](https://github.com/hifihedgehog/HIDMaestro/releases/tag/v2.0.2), MIT |
 | HidHide driver | 1.5.230.0 | [Official signed x64 installer](https://github.com/nefarius/HidHide/releases/tag/v1.5.230.0), MIT |
 | Nefarius.Drivers.HidHide | 3.4.0 | NuGet, MIT |
 | Nefarius.Utilities.DeviceManagement | 5.2.0 | NuGet, MIT |
 | Nefarius.Vicius.Abstractions | 1.4.1 | NuGet, MIT; no online update service is used |
-| usbip-win2 | 0.9.7.5 | Bundled, unmodified upstream transport inside HIDMaestro; BSD-2-Clause, see HIDMaestro third-party notices |
+| usbip-win2 | 0.9.8.1 | Bundled, unmodified upstream transport inside HIDMaestro; BSD-2-Clause, see HIDMaestro third-party notices |
 | Microsoft GameInput | 3.5.278 | [Official NuGet package](https://www.nuget.org/packages/Microsoft.GameInput/3.5.278), supplied Microsoft license and notices |
 | .NET / ServiceController | 10 / 10.0.0 | Microsoft/.NET, MIT; self-contained runtime included in setup |
 | Microsoft.Extensions abstractions | 10.0.8 | Microsoft/.NET, MIT |
@@ -21,8 +21,8 @@ G7 Bridge source is MIT licensed. Third-party components retain the licenses lis
 
 `Restore-Vendor.ps1` downloads only HIDMaestro's official release archive when the library is absent. The large generated library is intentionally not stored in Git. Both archive and extracted DLL must match pinned SHA-256 hashes:
 
-- HIDMaestro x64 release ZIP: `1fa4a57b6f2db9dc943bb81047808fdf097955497b96f22c1944ddd961b59605`
-- HIDMaestro.Core.dll: `d613be086178d34def0c8d3869e801b55ce16d49b7a6e4516281d067aa730d9a`
+- HIDMaestro x64 release ZIP: `bec5fa3936a9a2a0e0d0835974a37196cb6502c36796577167c94b49f62d326c`
+- HIDMaestro.Core.dll: `593509d1b48168a986c62273b2876351cab5f1d7766f94033bbd8b63fd628ae6`
 - HidHide x64 installer: `f4bbbcb82e6258641b887c74bc81c4c5f66e4aa811808dfc304347687b7605f6`
 - Inno Setup compiler installer: `9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732`
 
@@ -38,4 +38,6 @@ The GameInput header, loader source, import library and release notes are kept u
 - Selected physical controller payloads from manually operated Nexus captures informed session framing and independent button decoding. The test fixtures contain controller input only, not raw USB captures, device serial numbers or authentication exchanges.
 - Valve/SDL [Steam controller protocol definitions](https://github.com/libsdl-org/SDL/tree/main/src/joystick/hidapi/steam) and the stock Triton decoder: report layout, button semantics and sensor scaling. See the supplied SDL zlib notice. SDL itself is not a runtime dependency of the app.
 
-The original HIDMaestro `steam-controller-2` profile is embedded as a template. At runtime, G7 Bridge changes its virtual compatibility timestamp using Steam's local target version and disables the SDK idle-frame generator so only bridge-owned raw input is emitted. Steam's files and the physical controller firmware are not modified.
+The HIDMaestro 2.0.2 `steam-controller-2` profile is embedded as an unmodified upstream template. At runtime, G7 Bridge sets the virtual compatibility timestamp using Steam's local target version. It uses `extendedReport.send: "submit"` because the bridge owns its IMU timestamps and sends both controller (`0x42`) and battery (`0x43`) reports; the SDK's default clock would retain only the latest raw report. The fixed 4 ms idle repeat stays enabled and repeats the submitted raw frame. The old zero-interval workaround is removed.
+
+Only the two `instanceSerial` patches for the board and unit strings are removed. This preserves `MXA9960200001` / `FXA9960200001`, the command-channel identity used by existing Steam layouts, together with the existing keyed USB identity. Other upstream feature responses and patches are retained. Steam's files and the physical controller firmware are not modified. See [G7Bridge issue #5](https://github.com/link007113/G7Bridge/issues/5) and [upstream issue #72](https://github.com/hifihedgehog/HIDMaestro/issues/72).

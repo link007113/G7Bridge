@@ -1,5 +1,28 @@
 # Validation and known limits
 
+## HIDMaestro 2.0.2 update (1.3.0-rc.2)
+
+The dependency archive and DLL are pinned to the official 2.0.2 release hashes.
+The upstream Triton template is prepared with `send: submit`, the fixed 4 ms idle
+repeat and the existing board/unit serials; see `DEPENDENCIES.md` for the reason.
+
+On 2026-10-23 the 82 core tests passed, including regressions first observed failing
+for the former zero idle interval, changed serial patches and new command-channel
+attribute matching. The shipped upstream descriptor and USB configuration remain
+unchanged after preparation.
+
+An elevated, isolated Windows HID test used VID/PID `1209:F7B2` and a separate key,
+with the production service temporarily stopped and then restored. It passed all
+20 button presses/releases, signed sticks, partial and full independent triggers,
+signed gyro/accelerometer/quaternion bytes, 30 idle repetitions with no injected
+neutral frame, separate battery and input delivery, command-channel board/unit
+serials and firmware attribute, and HID rumble writes reaching the SDK callback
+with both motor strengths plus an explicit stop. This test did not open or vibrate
+the physical G7. See `tools/G7Bridge.Validation` to reproduce it.
+
+Physical controller, Steam profile loading and actual motor acceptance for this
+update are recorded separately below when those checks have been performed.
+
 ## Existing 1.0 controller path
 
 Previous measurements on one Windows x64 PC with a G7 Pro and 2.4 GHz receiver demonstrated background GIP telemetry under LocalSystem with Developer Mode off, real input reaching the virtual Steam Controller, recognition and sensors in stock SDL, battery reports, standard rumble requests reaching the Windows gamepad API, and restoration of normal physical input when stopping the service.

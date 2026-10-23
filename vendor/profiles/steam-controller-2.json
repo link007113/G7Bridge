@@ -11,54 +11,155 @@
   "backend": "usbip",
   "descriptor": "05010902a10185400901a100050919012902150025017501950281027506950181010501093009311581257f750895028106950109388106050c0a380295018106c0c005010906a1018541050719e029e71500250175019508810281011900296515002565750895068100c00600ff0901a1018542150026ff0075089535094281028544150026ff0075089505094481028579150026ff0075089501097981028543150026ff007508950e09438102857b150026ff007508950c097b81028545150026ff007508952d094581028580150026ff0075089509098091028581150026ff0075089507098191028582150026ff0075089503098291028583150026ff0075089509098391028584150026ff0075089508098491028585150026ff0075089503098591028586150026ff0075089503098691028587150026ff007508953f098791028589150026ff007508953f098991028588150026ff007508953f098891028501953f0901b1028502953f0901b102c0",
   "inputReportSize": 54,
-  "notes": "Issue #56, from PadForge discussion #337. Valve's 2026 Steam Controller, the one SDL calls Triton (k_eControllerType_SteamControllerTriton, controller_list.h: 28DE:1302 wired, 0x1303 BLE, 0x1304 and 0x1305 the Proteus and Nereid dongles). SDL_hidapi_steam_triton.c binds it on any interface of a wired unit and names it 'Steam Controller'. Unlike the Deck and the 2015 controller, Triton presents ONE HID interface carrying everything by report id: 0x40 mouse and 0x41 keyboard (its lizard reports live in the same descriptor rather than on their own interfaces), 0x42 the 53-byte controller state SDL reads as ID_TRITON_CONTROLLER_STATE, 0x45 the 45-byte BLE state, 0x43 battery, 0x79 wireless status, the 0x80..0x89 haptic and rumble output reports, and a 63-byte command channel on feature reports 1 and 2. The descriptor is verbatim from OpenPuck's ReversePuckFirmware (ctrl_usb.cpp CTRL_HID_DESC), an emulation of this controller that a live Steam client already accepts, and every report id in it matches SDL's own ID_TRITON_* constants. The feature answers are grounded on two independent reads of real hardware that agree record for record: OpenPuck's identity.cpp ATTR83 (read with 'scmd 1302 --up 1 83') and CouchTurtle/sc2-research docs/FIRMWARE_PROTOCOL.md, which logs the same five tags in the same order off a live controller and matches Steam's own update JSON on two of the values. The firmware build timestamp shipped here is the newer of the two real builds (0x6A18D057, 2026-05-28) so Steam sees a current unit. Consumers drive report 0x42 through SubmitRawReport; Steam's haptic writes arrive on OutputReceived as output reports 0x80 and up.",
+  "notes": "Issue #56, from PadForge discussion #337. Valve's 2026 Steam Controller, the one SDL calls Triton (k_eControllerType_SteamControllerTriton, controller_list.h: 28DE:1302 wired, 0x1303 BLE, 0x1304 and 0x1305 the Proteus and Nereid dongles). SDL_hidapi_steam_triton.c binds it on any interface of a wired unit and names it 'Steam Controller'. Unlike the Deck and the 2015 controller, Triton presents ONE HID interface carrying everything by report id: 0x40 mouse and 0x41 keyboard (its lizard reports live in the same descriptor rather than on their own interfaces), 0x42 the 53-byte controller state SDL reads as ID_TRITON_CONTROLLER_STATE, 0x45 the 45-byte BLE state, 0x43 battery, 0x79 wireless status, the 0x80..0x89 haptic and rumble output reports, and a 63-byte command channel on feature reports 1 and 2. The descriptor is verbatim from OpenPuck's ReversePuckFirmware (ctrl_usb.cpp CTRL_HID_DESC), an emulation of this controller that a live Steam client already accepts, and every report id in it matches SDL's own ID_TRITON_* constants. The feature answers are grounded on two independent reads of real hardware that agree record for record: OpenPuck's identity.cpp ATTR83 (read with 'scmd 1302 --up 1 83') and CouchTurtle/sc2-research docs/FIRMWARE_PROTOCOL.md, which logs the same five tags in the same order off a live controller and matches Steam's own update JSON on two of the values. The firmware build timestamp shipped here is the newer of the two real builds (0x6A18D057, 2026-05-28) so Steam sees a current unit. Consumers drive report 0x42 through SubmitRawReport; Steam's haptic writes arrive on OutputReceived as output reports 0x80 and up. Issue #72: the pad reports on its own 4 ms clock (extendedReport.send \"clock\"), whatever rate the consumer submits at, each report carrying the latest state. Valve's controller firmware (Steam's IBEX_FW images, and sc26re's settings registry) defaults SETTING_FRAME_RATE, setting 64, to 4, sc2-research measured about 266 reports a second from a real unit (docs/HID_REPORT_FORMAT.md), and SDL_hidapi_steam_triton.c calls it 'actually about 4 ms'. Through SubmitState, motion is the SDK's calibrated channel, which SDL reads back as the IMU block's (X, Z, -Y) at 32768 counts per 2000 deg/s and 16384 per g (SDL_hidapi_steam_triton.c:279-286). Touchpad finger 0 is the left trackpad and finger 1 the right, each with its pressure. The trigger bits set at 29490 of 32767, 90 percent, the default of the firmware's SETTING_TRIGGER_THRESHOLD_PERCENT (settings entry 68 in Steam's IBEX_FW_6941BF08.fw and IBEX_FW_6AC686B3.fw, range 40 to 99).",
+  "valueSources": {
+    "steamUpdater": {
+      "kind": "keyedHexFile",
+      "roots": [
+        {
+          "registry": "HKCU\\Software\\Valve\\Steam",
+          "value": "SteamPath"
+        },
+        {
+          "registry": "HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam",
+          "value": "InstallPath"
+        },
+        {
+          "knownFolder": "ProgramFilesX86",
+          "path": "Steam"
+        }
+      ],
+      "path": "bin\\hardwareupdater\\hardwareupdater.cfg"
+    }
+  },
   "featureStubs": {
-    "match": "lastMessage",
-    "messageByte": 1,
     "reports": [
       {
-        "id": "0x83",
+        "id": "0x01",
+        "message": {
+          "onReport": "0x01",
+          "at": 1,
+          "value": "83"
+        },
         "size": 64,
-        "comment": "ID_GET_ATTRIBUTES_VALUES. The 25-byte attribute blob verbatim from a real 28DE:1302 (OpenPuck ReversePuckFirmware/identity.cpp, read with 'scmd 1302 --up 1 83'). As (tag, u32-LE) records: 01 product 0x1302, 02 capabilities, 0A bootloader build 0x68D2F92E, 04 firmware build 0x6A18D057, 09 board revision 0x48. Steam validates these byte for byte - two wrong bytes and it re-asks forever - so none of them is invented, and all of them are firmware and model values shared across units rather than per-device ones.",
-        "data": "018319010213000002000000000a2ef9d2680457d0186a0948000000"
+        "data": "018319010213000002000000000a2ef9d2680457d0186a0948000000",
+        "patch": [
+          {
+            "at": 19,
+            "length": 4,
+            "encoding": "uint32-le",
+            "source": "steamUpdater",
+            "key": "TRITON_FW_TS"
+          }
+        ],
+        "replyHead": "requestReportId",
+        "notify": true,
+        "comment": "ID_GET_ATTRIBUTES_VALUES. The 25-byte attribute blob verbatim from a real 28DE:1302 (OpenPuck ReversePuckFirmware/identity.cpp, read with 'scmd 1302 --up 1 83'). As (tag, u32-LE) records: 01 product 0x1302, 02 capabilities, 0A bootloader build 0x68D2F92E, 04 firmware build 0x6A18D057, 09 board revision 0x48. The firmware build at offset 19 follows TRITON_FW_TS in Steam's hardwareupdater.cfg (issue #62). Steam's updater lists a controller whose build differs from that value in either direction, and a real unit that has taken the update reports exactly that value. Without Steam the captured build stands. Every other byte is the capture's, and all of them are firmware and model values shared across units rather than per-device ones."
       },
       {
-        "id": "0xAE",
-        "param": 0,
+        "id": "0x01",
+        "message": {
+          "onReport": "0x01",
+          "at": 1,
+          "value": "AE"
+        },
+        "param": {
+          "at": 3,
+          "value": "00"
+        },
         "size": 64,
-        "comment": "ID_GET_STRING_ATTRIBUTE index 0, the board serial, in Valve's own format.",
-        "data": "01ae14004d584139393630323030303031"
+        "data": "01ae14004d584139393630323030303031",
+        "patch": [
+          {
+            "at": 4,
+            "length": 13,
+            "encoding": "ascii",
+            "source": "instanceSerial"
+          }
+        ],
+        "replyHead": "requestReportId",
+        "notify": true,
+        "comment": "ID_GET_STRING_ATTRIBUTE index 0, the board serial, in Valve's own format. Each controller answers its own (issue #72): serial variant 0, a keyless controller at index 0, keeps MXA9960200001, and another variant is added into the trailing digits, as a captured USB serial's is."
       },
       {
-        "id": "0xAE",
-        "param": 1,
+        "id": "0x01",
+        "message": {
+          "onReport": "0x01",
+          "at": 1,
+          "value": "AE"
+        },
+        "param": {
+          "at": 3,
+          "value": "01"
+        },
         "size": 64,
-        "comment": "Index 1, the unit serial. Constant, as every serial this catalog ships is.",
-        "data": "01ae140146584139393630323030303031"
+        "data": "01ae140146584139393630323030303031",
+        "patch": [
+          {
+            "at": 4,
+            "length": 13,
+            "encoding": "ascii",
+            "source": "instanceSerial"
+          }
+        ],
+        "replyHead": "requestReportId",
+        "notify": true,
+        "comment": "Index 1, the unit serial. Steam names the controller's config set after it (configset_<unit serial>.vdf), so two controllers answering one serial shared one configuration. Each controller answers its own (issue #72): serial variant 0, a keyless controller at index 0, keeps FXA9960200001, and variant 1 answers FXA9960200002. A controller created with an identity key, as PadForge creates them, answers its identity's own unit serial, so Steam files it under a new config set once, the way it files any new unit."
       },
       {
-        "id": "0xAE",
-        "param": 3,
+        "id": "0x01",
+        "message": {
+          "onReport": "0x01",
+          "at": 1,
+          "value": "AE"
+        },
+        "param": {
+          "at": 3,
+          "value": "03"
+        },
         "size": 64,
-        "comment": "Index 3 is the one Steam actually checks: the Valve constant 7054257d2da7, the same on every real unit.",
-        "data": "01ae1403373035343235376432646137"
+        "data": "01ae1403373035343235376432646137",
+        "replyHead": "requestReportId",
+        "notify": true,
+        "comment": "Index 3 is the one Steam actually checks: the Valve constant 7054257d2da7, the same on every real unit."
       },
       {
-        "id": "0xAE",
+        "id": "0x01",
+        "message": {
+          "onReport": "0x01",
+          "at": 1,
+          "value": "AE"
+        },
         "size": 64,
-        "comment": "Any other index reads back 0xFF where the index would be, which is how a real unit says the string is not provisioned: Steam's own hardwareupdater tests that byte for 0xFF (CouchTurtle/sc2-research tools/attr_query.py, read out of the shipped updater bundle).",
-        "data": "01ae14ff"
+        "data": "01ae14ff",
+        "replyHead": "requestReportId",
+        "notify": true,
+        "comment": "Any other index reads back 0xFF where the index would be, which is how a real unit says the string is not provisioned: Steam's own hardwareupdater tests that byte for 0xFF (CouchTurtle/sc2-research tools/attr_query.py, read out of the shipped updater bundle)."
       },
       {
-        "id": "0xB4",
+        "id": "0x01",
+        "message": {
+          "onReport": "0x01",
+          "at": 1,
+          "value": "B4"
+        },
         "size": 64,
-        "comment": "Wireless transport state. 0x01 = wired, no radio link up.",
-        "data": "01b40101"
+        "data": "01b40101",
+        "replyHead": "requestReportId",
+        "notify": true,
+        "comment": "Wireless transport state. 0x01 = wired, no radio link up."
       },
       {
-        "id": "0x87",
+        "id": "0x01",
+        "message": {
+          "onReport": "0x01",
+          "at": 1,
+          "value": "87"
+        },
         "size": 64,
         "echo": true,
+        "replyHead": "requestReportId",
+        "notify": true,
         "comment": "ID_SET_SETTINGS_VALUES reads back as the settings block the host just wrote. Verified on a real Steam Deck answering a real Steam client: five SET/GET pairs in that capture, every reply byte-identical to its write. Steam performs this read during the claim, and a device that stalls it never finishes being claimed. Triton's channel rides feature report 1, so the echo carries that report id back too."
       }
     ]
@@ -109,6 +210,7 @@
     "size": 54,
     "alwaysArmed": true,
     "idleFrameIntervalMs": 4,
+    "send": "clock",
     "fields": [
       {
         "byte": 0,
@@ -125,8 +227,12 @@
       },
       {
         "byte": 2,
-        "bits": "0-27",
+        "bits": "0-29",
         "type": "button-mask",
+        "triggerThreshold": {
+          "max": 32767,
+          "at": 29490
+        },
         "buttons": [
           "A",
           "B",
@@ -148,25 +254,29 @@
           "LeftPaddle",
           "LeftPaddle2",
           "LeftBumper",
-          "_",
+          "RightStickTouch",
           "RIGHTPAD_TOUCH",
-          "Touchpad",
+          "RightTouchpad",
           "RT_DIGITAL",
-          "_",
+          "LeftStickTouch",
           "LEFTPAD_TOUCH",
-          "_",
-          "LT_DIGITAL"
+          "LeftTouchpad",
+          "LT_DIGITAL",
+          "RightGripTouch",
+          "LeftGripTouch"
         ]
       },
       {
         "byte": 6,
         "type": "uint16-trigger",
-        "semantic": "leftTrigger"
+        "semantic": "leftTrigger",
+        "max": 32767
       },
       {
         "byte": 8,
         "type": "uint16-trigger",
-        "semantic": "rightTrigger"
+        "semantic": "rightTrigger",
+        "max": 32767
       },
       {
         "byte": 10,
@@ -176,7 +286,8 @@
       {
         "byte": 12,
         "type": "int16-axis",
-        "semantic": "leftStickY"
+        "semantic": "leftStickY",
+        "invert": true
       },
       {
         "byte": 14,
@@ -186,7 +297,8 @@
       {
         "byte": 16,
         "type": "int16-axis",
-        "semantic": "rightStickY"
+        "semantic": "rightStickY",
+        "invert": true
       },
       {
         "byte": 18,
@@ -196,12 +308,14 @@
       {
         "byte": 20,
         "type": "int16-pad",
-        "semantic": "leftPadY"
+        "semantic": "leftPadY",
+        "invert": true
       },
       {
         "byte": 22,
         "type": "uint16-pressure",
-        "semantic": "leftPadPressure"
+        "semantic": "leftPadPressure",
+        "max": 32767
       },
       {
         "byte": 24,
@@ -211,50 +325,95 @@
       {
         "byte": 26,
         "type": "int16-pad",
-        "semantic": "rightPadY"
+        "semantic": "rightPadY",
+        "invert": true
       },
       {
         "byte": 28,
         "type": "uint16-pressure",
-        "semantic": "rightPadPressure"
+        "semantic": "rightPadPressure",
+        "max": 32767
       },
       {
         "byte": 30,
-        "type": "uint32-rolling",
+        "type": "uint32-le",
         "semantic": "sensorTimestamp",
-        "initial": 1,
-        "stride": 4000
+        "divisor": 3,
+        "clock": "accumulate",
+        "holdWhile": "imuMode==0"
       },
       {
         "byte": 34,
         "type": "int16-le",
-        "semantic": "accelX"
+        "semantic": "accelGX",
+        "scale": 16384
       },
       {
         "byte": 36,
         "type": "int16-le",
-        "semantic": "accelY"
+        "semantic": "accelGZ",
+        "scale": 16384,
+        "negate": true
       },
       {
         "byte": 38,
         "type": "int16-le",
-        "semantic": "accelZ"
+        "semantic": "accelGY",
+        "scale": 16384
       },
       {
         "byte": 40,
         "type": "int16-le",
-        "semantic": "gyroPitch"
+        "semantic": "gyroDpsX",
+        "scale": [
+          2048,
+          125
+        ]
       },
       {
         "byte": 42,
         "type": "int16-le",
-        "semantic": "gyroYaw"
+        "semantic": "gyroDpsZ",
+        "scale": [
+          2048,
+          125
+        ],
+        "negate": true
       },
       {
         "byte": 44,
         "type": "int16-le",
-        "semantic": "gyroRoll"
+        "semantic": "gyroDpsY",
+        "scale": [
+          2048,
+          125
+        ]
       }
     ]
+  },
+  "protocol": {
+    "state": [
+      { "name": "imuMode", "bits": 16, "initial": "0", "keepOnPortReset": true }
+    ],
+    "commands": {
+      "source": "setReport",
+      "rules": [
+        {
+          "match": "01 87",
+          "minLength": 3,
+          "storeRecord": {
+            "at": 3,
+            "size": 3,
+            "count": { "byte": 2, "divideBy": 3 },
+            "key": { "offset": 0, "value": "30" },
+            "store": { "imuMode": { "offset": 1, "bytes": 2, "order": "le" } }
+          }
+        },
+        {
+          "match": "01 8E",
+          "set": { "imuMode": 0 }
+        }
+      ]
+    }
   }
 }

@@ -1,13 +1,13 @@
 $ErrorActionPreference = 'Stop'
 $destination = Join-Path $PSScriptRoot 'vendor\HIDMaestro.Core.dll'
-$expectedDll = 'D613BE086178D34DEF0C8D3869E801B55CE16D49B7A6E4516281D067AA730D9A'
+$expectedDll = '593509D1B48168A986C62273B2876351CAB5F1D7766F94033BBD8B63FD628AE6'
 if ((Test-Path -LiteralPath $destination) -and (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -eq $expectedDll) { return }
 $cache = Join-Path $PSScriptRoot 'artifacts\downloads'
 New-Item -ItemType Directory -Path $cache -Force | Out-Null
-$archive = Join-Path $cache 'HIDMaestro-v1.9.0.zip'
-$expectedArchive = '1FA4A57B6F2DB9DC943BB81047808FDF097955497B96F22C1944DDD961B59605'
+$archive = Join-Path $cache 'HIDMaestro-v2.0.2.zip'
+$expectedArchive = 'BEC5FA3936A9A2A0E0D0835974A37196CB6502C36796577167C94B49F62D326C'
 if (-not (Test-Path -LiteralPath $archive)) {
-    Invoke-WebRequest -Uri 'https://github.com/hifihedgehog/HIDMaestro/releases/download/v1.9.0/HIDMaestro-v1.9.0.zip' -OutFile $archive
+    Invoke-WebRequest -Uri 'https://github.com/hifihedgehog/HIDMaestro/releases/download/v2.0.2/HIDMaestro-v2.0.2.zip' -OutFile $archive
 }
 if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expectedArchive) { throw 'HIDMaestro archive hash mismatch; download not used.' }
 $zip = [IO.Compression.ZipFile]::OpenRead($archive)
@@ -19,4 +19,4 @@ try {
     if ((Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash -ne $expectedDll) { throw 'HIDMaestro DLL hash mismatch; library not used.' }
     Move-Item -LiteralPath $temporary -Destination $destination -Force
 } finally { $zip.Dispose() }
-Write-Output 'Restored pinned HIDMaestro.Core 1.9.0. No drivers installed.'
+Write-Output 'Restored pinned HIDMaestro.Core 2.0.2. No drivers installed.'
