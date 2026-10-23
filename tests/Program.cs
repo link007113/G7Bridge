@@ -4,6 +4,15 @@ using System.Globalization;
 
 UiLanguage.Initialize(CultureInfo.InvariantCulture);
 var tests = new (string Name, Action Body)[] {
+    ("A button watcher arms on release before accepting a new press and release, also after reconnect",()=>{
+        var cycle=new G7Bridge.Validation.ButtonCycle();
+        True(!cycle.Accept(true));True(!cycle.Accept(true));True(!cycle.PressSeen);
+        True(!cycle.Accept(false));True(!cycle.PressSeen);
+        True(!cycle.Accept(true));True(cycle.PressSeen);True(cycle.Accept(false));
+        var reconnected=new G7Bridge.Validation.ButtonCycle();
+        True(!reconnected.Accept(true));True(!reconnected.Accept(false));True(!reconnected.PressSeen);
+        True(!reconnected.Accept(true));True(reconnected.Accept(false));
+    }),
     ("Only the USB root of a supported GameSir receiver is selectable",()=>{
         True(ReceiverPresence.IsReceiverRoot(@"USB\VID_3537&PID_106B\0000DF3F3CCA6347"));
         True(ReceiverPresence.IsReceiverRoot(@"usb\vid_3537&pid_100a\00CC848C41"));

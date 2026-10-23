@@ -6,10 +6,14 @@ The dependency archive and DLL are pinned to the official 2.0.2 release hashes.
 The upstream Triton template is prepared with `send: submit`, the fixed 4 ms idle
 repeat and the existing board/unit serials; see `DEPENDENCIES.md` for the reason.
 
-On 2026-10-23 the 82 core tests passed, including regressions first observed failing
+On 2026-10-23 the 83 core tests passed, including regressions first observed failing
 for the former zero idle interval, changed serial patches and new command-channel
 attribute matching. The shipped upstream descriptor and USB configuration remain
 unchanged after preparation.
+
+The focused button watcher also has a red-to-green regression requiring an
+initial released state, followed by a new press and release on the same live
+connection. A button already held while attaching cannot complete the check.
 
 An elevated, isolated Windows HID test used VID/PID `1209:F7B2` and a separate key,
 with the production service temporarily stopped and then restored. It passed all

@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using G7Bridge.Core;
+using G7Bridge.Validation;
 using HIDMaestro;
 using Microsoft.Win32.SafeHandles;
 
@@ -162,14 +163,16 @@ static async Task WatchButton(string name,string path)
         try {
             using var device=await HidDevice.Find(0x28DE,0x1302,VirtualControllerIdentity.UsbSerial);
             byte[]? pressed=null;
+            var cycle=new ButtonCycle();
             while(clock.Elapsed.TotalMinutes<30) {
                 byte[] frame=await device.Read();if(frame[0]!=0x42)continue;
                 bool down=(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(2))&mask)!=0;
-                if(down && pressed is null) {
+                bool completed=cycle.Accept(down);
+                if(cycle.PressSeen && pressed is null) {
                     pressed=frame;
                     File.WriteAllText(path,JsonSerializer.Serialize(new{Button=button.ToString(),Completed=false,State="Press observed; waiting for release",Press=Convert.ToHexString(pressed)}));
                 }
-                if(!down && pressed is not null) {
+                if(completed && pressed is not null) {
                     var result=new{Button=button.ToString(),Completed=true,Seconds=clock.Elapsed.TotalSeconds,Press=Convert.ToHexString(pressed),Release=Convert.ToHexString(frame)};
                     File.WriteAllText(path,JsonSerializer.Serialize(result,new JsonSerializerOptions{WriteIndented=true}));
                     Console.WriteLine(JsonSerializer.Serialize(result));return;
