@@ -127,10 +127,16 @@ struct Factory : winrt::implements<Factory,Custom::ICustomGameControllerFactory>
             {std::lock_guard lock(mutex);++calls;}
             const auto vendor=provider.HardwareVendorId(),product=provider.HardwareProductId();
             {std::lock_guard lock(mutex);lastVendor=vendor;lastProduct=product;}
-            // This supplementary route is enabled only for Anthony's observed PID.
-            if(vendor!=0x3537 || product!=0x106B){std::lock_guard lock(mutex);++ignored;return nullptr;}
+            if(vendor!=0x3537 || (product!=0x106B && product!=XboxModeProduct)) {
+                std::lock_guard lock(mutex);++ignored;return nullptr;
+            }
             auto gip=provider.try_as<Custom::GipGameControllerProvider>();
-            if(!gip){std::lock_guard lock(mutex);lastError=E_NOINTERFACE;return nullptr;}
+            if(!gip) {
+                std::lock_guard lock(mutex);
+                if(product==XboxModeProduct)++ignored;
+                else lastError=E_NOINTERFACE;
+                return nullptr;
+            }
             auto weak=get_weak();
             auto shell=new AggregationShell([weak,provider,gip](auto const& outer) {
                 winrt::Windows::Foundation::IInspectable inner;
@@ -275,7 +281,8 @@ HRESULT OpenDirectVendorChannel(const wchar_t* instance,std::shared_ptr<VendorCh
         const auto deadline=GetTickCount64()+3000;
         std::vector<winrt::com_ptr<Sink>> providers;
         do {providers=channel.factory->Connected();if(!providers.empty())break;Sleep(20);}while(GetTickCount64()<deadline);
-        if(providers.size()!=1)return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        if(providers.size()!=1 || providers.front()->identity.HardwareProductId()!=roots.front().product)
+            return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
         channel.sink=providers.front();channel.sink->Attach(channel.inbox);
         {std::lock_guard lock(channel.inbox->mutex);channel.inbox->note=L"Direct GIP input: one verified GameSir USB root and one provider; independent buttons, sticks and gyro";}
         return S_OK;
@@ -333,6 +340,7 @@ HRESULT OpenVendorChannel(IGameInput* api,IGameInputDevice* device,std::shared_p
         }
         std::wstring scopeDetails;
         HRESULT hr=CheckScope(api,device,static_cast<uint32_t>(providers.size()),scopeDetails);
+        if(SUCCEEDED(hr) && providers.front()->identity.HardwareProductId()!=0x106B)hr=HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
         if(FAILED(hr)) {
             std::lock_guard lock(channel.inbox->mutex);channel.inbox->note=L"GIP provider could not be uniquely matched; "+scopeDetails;return hr;
         }

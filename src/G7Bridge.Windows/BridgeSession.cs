@@ -58,7 +58,7 @@ internal sealed class BridgeSession : IAsyncDisposable
         IControllerTransport? transport=null;
         try {
             transport=Open(device);
-            bool heartbeatEnabled=device.Transport=="HID" || G7DeviceCatalog.IsSessionIdentity(G7DeviceCatalog.Vendor,device.ProductId);
+            bool heartbeatEnabled=device.Transport=="HID" || IsSessionDevice(device);
             lock(sync) { connected=true;exclusive=transport.Exclusive;nativeInstanceId=(transport as GameInputTransport)?.InstanceId??"";gyroInitialized=heartbeatEnabled;phase="Receiver connected — reading input"; }
             Log?.Invoke(heartbeatEnabled ? "Connected. Documented session heartbeats active; controller profiles are unchanged." :
                 "Connected. Reading ordinary input. Gyro activation is requested by the controller service.");
@@ -225,6 +225,10 @@ internal sealed class BridgeSession : IAsyncDisposable
         _=>new UsbTransport(device,message=>Log?.Invoke(message))
     };
 
+    private static bool IsSessionDevice(ControllerDevice device)
+        =>G7DeviceCatalog.IsSessionIdentity(G7DeviceCatalog.Vendor,device.ProductId,
+            verifiedGip:device.Transport=="GameInput" && GameInputTransport.IsDirectGip(device.Key));
+
     private async Task<(IControllerTransport Transport,ControllerDevice Device)> InitializeNativeGyro(ControllerDevice original,GameInputTransport current,CancellationToken stop)
     {
         if(original.ProductId!=0x100A)return(current,original);
@@ -253,7 +257,7 @@ internal sealed class BridgeSession : IAsyncDisposable
         while(deadline.ElapsedMilliseconds<G7SessionSetup.ReenumerationTimeoutMilliseconds) {
             await Task.Delay(350,stop);
             var devices=GameInputTransport.Enumerate().Where(d=>d.PhysicalKey==key).ToArray();
-            var candidates=devices.Where(d=>G7DeviceCatalog.IsSessionIdentity(G7DeviceCatalog.Vendor,d.ProductId)).ToArray();
+            var candidates=devices.Where(IsSessionDevice).ToArray();
             var seen=devices.Length==0?"temporarily absent":string.Join(", ",devices.Select(d=>$"3537:{d.ProductId:X4}"));
             if(seen!=lastSeen){lastSeen=seen;Log?.Invoke("Windows devices at the same USB location: "+seen);}
             if(candidates.Length!=1){stable=0;continue;}

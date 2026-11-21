@@ -107,6 +107,14 @@ static void Info(const GameInputDeviceInfo* d,G7Info& out) {
     }
     wcsncpy_s(out.reports,reports.c_str(),_TRUNCATE);
 }
+static bool DirectGipInfo(G7Native::GipUsbDevice const& root,G7Info& info) {
+    if(root.instance.size()+4>=std::size(info.id) || root.location.size()>=std::size(info.key))return false;
+    info={};info.vendor=0x3537;info.product=root.product;info.family=GameInputFamilyXboxOne;
+    info.kinds=GameInputKindRawDeviceReport|GameInputKindGamepad;
+    wcscpy_s(info.id,(L"GIP:"+root.instance).c_str());wcscpy_s(info.key,root.location.c_str());
+    wcscpy_s(info.name,L"GameSir G7 Pro directe GIP");wcscpy_s(info.reports,L"GIP IN 10:60 IN 20:32 OUT 0F:1/2");
+    return true;
+}
 static HRESULT Create(std::unique_ptr<Context>& out) {
     out=std::make_unique<Context>();
     HRESULT hr=GameInputCreate(&out->api);if(FAILED(hr))return hr;
@@ -136,14 +144,12 @@ API HRESULT __cdecl g7_enumerate(G7Info* items,uint32_t capacity,uint32_t* count
         // GIP discovery must not depend on Microsoft's synthesized XInput HID
         // child, because HidHide intentionally hides that child from games.
         auto direct=G7Native::ListGipDevices();
-        if(!direct.empty()) {
-            std::erase_if(inventory.items,[](auto const& x){return x.product==0x106B;});
-            for(auto const& root:direct) {
-                if(root.instance.size()+4>=65 || root.location.size()>=512)continue;
-                G7Info item{};item.vendor=0x3537;item.product=0x106B;item.family=1;item.kinds=GameInputKindRawDeviceReport|GameInputKindGamepad;
-                wcscpy_s(item.id,(L"GIP:"+root.instance).c_str());wcscpy_s(item.key,root.location.c_str());
-                wcscpy_s(item.name,L"GameSir G7 Pro directe GIP");wcscpy_s(item.reports,L"GIP IN 10:60 IN 20:32 OUT 0F:1/2");inventory.items.push_back(item);
-            }
+        if(std::any_of(direct.begin(),direct.end(),[](auto const& root){return root.product==G7Native::OriginalGipProduct;})) {
+            std::erase_if(inventory.items,[](auto const& x){return x.product==G7Native::OriginalGipProduct;});
+        }
+        for(auto const& root:direct) {
+            G7Info item{};
+            if(DirectGipInfo(root,item))inventory.items.push_back(item);
         }
         *count=static_cast<uint32_t>(std::min<size_t>(capacity,inventory.items.size()));
         std::copy_n(inventory.items.data(),*count,items);return S_OK;
@@ -168,11 +174,10 @@ API HRESULT __cdecl g7_open_v2(const wchar_t* idText,void** handle,G7Info* info,
     try {
         if(wcsncmp(idText,L"GIP:",4)==0) {
             const auto roots=G7Native::ListGipDevices();
-            if(roots.size()!=1 || roots.front().instance!=idText+4 || roots.front().location.size()>=512)return HRESULT_FROM_WIN32(ERROR_DUP_NAME);
-            auto context=std::make_unique<Context>();context->direct=true;context->product=0x106B;context->directInstance=roots.front().instance;
+            if(roots.size()!=1 || roots.front().instance!=idText+4 || !DirectGipInfo(roots.front(),*info))return HRESULT_FROM_WIN32(ERROR_DUP_NAME);
+            auto context=std::make_unique<Context>();context->direct=true;context->product=info->product;context->directInstance=roots.front().instance;
             *stage=10;HRESULT hr=G7Native::OpenDirectVendorChannel(context->directInstance.c_str(),context->vendor);if(FAILED(hr))return hr;
-            context->vendorPrepared=true;*info={};info->vendor=0x3537;info->product=0x106B;info->family=1;info->kinds=GameInputKindRawDeviceReport|GameInputKindGamepad;
-            wcscpy_s(info->key,roots.front().location.c_str());wcscpy_s(info->id,idText);wcscpy_s(info->name,L"GameSir G7 Pro directe GIP");wcscpy_s(info->reports,L"GIP IN 10:60 IN 20:32 OUT 0F:1/2");
+            context->vendorPrepared=true;
             *stage=0;*handle=context.release();return S_OK;
         }
         if(wcslen(idText)!=sizeof(APP_LOCAL_DEVICE_ID)*2)return E_INVALIDARG;
@@ -194,7 +199,7 @@ API HRESULT __cdecl g7_open_v2(const wchar_t* idText,void** handle,G7Info* info,
 API void __cdecl g7_close(void* handle) noexcept {delete static_cast<Context*>(handle);}
 API HRESULT __cdecl g7_rumble(void* handle,uint16_t left,uint16_t right) noexcept {
     if(!handle)return E_INVALIDARG;auto& c=*static_cast<Context*>(handle);
-    if(c.product!=0x106B || !c.vendor)return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+    if((c.product!=0x106B && c.product!=G7Native::XboxModeProduct) || !c.vendor)return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
     return G7Native::SetVendorRumble(c.vendor,left/65535.0,right/65535.0);
 }
 API HRESULT __cdecl g7_device_instance(void* handle,wchar_t* instance,uint32_t capacity) noexcept {

@@ -5,6 +5,7 @@ public static class PhysicalHidePolicy
     public static bool IsSelectedModel(string instanceId)
     {
         if(string.IsNullOrWhiteSpace(instanceId) || instanceId.Length>1023 || instanceId.Any(char.IsControl))return false;
+        if(ReceiverPresence.IsXboxModeRoot(instanceId))return true;
         var id=instanceId.ToUpperInvariant();
         return new[]{@"USB\VID_3537&PID_106B",@"HID\VID_3537&PID_106B"}.Any(prefix=>
             id.StartsWith(prefix,StringComparison.Ordinal) && id.Length>prefix.Length && id[prefix.Length] is '\\' or '&');

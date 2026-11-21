@@ -9,7 +9,7 @@ The current installer release is **1.3.0-rc.2 (preview)**, using HIDMaestro 2.0.
 ## Requirements
 
 - **Windows 11 24H2 or newer, x64**. ARM64, Windows 10 and Linux are not supported by this build.
-- **GameSir G7 Pro with its 2.4 GHz USB receiver**. The supported receiver identities are `3537:100A` and `3537:106B`. Wired, Bluetooth and other GameSir models are outside this release's supported scope.
+- **GameSir G7 Pro with its 2.4 GHz USB receiver**. The published installer supports `3537:100A` and `3537:106B`. Builds from this source also recognize `3537:1004` with the GIP compatible ID `USB\MS_COMP_XGIP10`. Wired, Bluetooth and other GameSir models are outside the supported scope.
 - Steam with support for the Steam Controller 2026, and Steam Input enabled for the game you want to use.
 - Administrator permission **during setup** for the service and drivers. Normal use does not need elevation, Nexus or Windows Developer Mode.
 
