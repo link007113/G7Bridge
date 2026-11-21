@@ -34,6 +34,8 @@ internal sealed class PhysicalHideLease : IDisposable
     private static string[] InputDescendants(string root)
     {
         if(CM_Locate_DevNodeW(out uint node,root,0)!=0)throw new IOException("The selected GameSir is no longer present.");
+        if(ReceiverPresence.IsXboxModeRoot(root) && !ReceiverScanner.HasGipProtocol(node))
+            throw new IOException("The selected GameSir 1004 receiver no longer reports GIP compatibility.");
         // Keep the GIP root accessible to Windows' controller-provider broker;
         // only its synthesized legacy input children belong in HidHide.
         var found=new List<string>();
@@ -79,7 +81,7 @@ internal sealed class PhysicalHideLease : IDisposable
     }
     private PhysicalHideLease(string instance,string[] instances)
     {
-        if(!PhysicalHidePolicy.IsSelectedModel(instance))throw new IOException("No unique GameSir 106B device instance to hide: "+instance);
+        if(!PhysicalHidePolicy.IsSelectedModel(instance))throw new IOException("No unique GameSir GIP device instance to hide: "+instance);
         if(File.Exists(JournalPath))throw new IOException("A previous hiding rule must be recovered first.");
         var blocked=api.BlockedInstanceIds.ToArray();bool active=api.IsActive;
         if(!PhysicalHidePolicy.CanActivate(active,api.IsAppListInverted,blocked,instance,instances))throw new IOException("HidHide has inactive rules for other devices; those rules will not be activated.");

@@ -151,11 +151,14 @@ internal sealed class ControllerService : ServiceBase
                         state.Phase=gate.Released?"Connection failed three times; the physical controller works normally until it reconnects":"Waiting for the GameSir G7 Pro";
                         ServiceFiles.Publish(state);await Task.Delay(500,stop);continue;
                     }
-                    bool hidingApplies=ReceiverPresence.IsSessionRoot(receivers[0].InstanceId);
+                    bool hidingApplies=receivers[0].IsSessionRoot;
                     // GameInput may still be starting right after sign-in, so an enumeration
                     // error gets the same grace period as a controller it does not report yet.
                     ControllerDevice[] devices;
-                    try {devices=GameInputTransport.Enumerate().Where(d=>d.ProductId is 0x100A or 0x106B && d.PhysicalKey==receivers[0].Location).ToArray();}
+                    try {
+                        devices=GameInputTransport.Enumerate().Where(d=>
+                            d.PhysicalKey==receivers[0].Location && d.ProductId is G7DeviceCatalog.XInputProduct or 0x106B or G7DeviceCatalog.XboxModeProduct).ToArray();
+                    }
                     catch(Exception) {Ended(gate.NotReported(Environment.TickCount64,hidingApplies));throw;}
                     if(devices.Length!=1) {
                         Ended(gate.NotReported(Environment.TickCount64,hidingApplies));

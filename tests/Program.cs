@@ -31,9 +31,15 @@ var tests = new (string Name, Action Body)[] {
         // Recorded by Windows on the development PC in the 100A window of 2026-09-28 18:32:53-18:33:02, controller on.
         True(ReceiverPresence.HasController([@"USB\VID_3537&PID_100A&MI_00\8&31B07931&0&0000",@"USB\VID_3537&PID_100A&IG_02\9&5F23AA5&0&02",@"HID\VID_3537&PID_100A&IG_02\A&2EE197D2&0&0000"]));
     }),
-    ("Only the 106B session receiver has hideable paired controller children",()=>{
+    ("Known GIP receiver roots have hideable paired controller children",()=>{
         True(ReceiverPresence.IsSessionRoot(@"USB\VID_3537&PID_106B\0000DF3F3CCA6347"));
         True(!ReceiverPresence.IsSessionRoot(@"USB\VID_3537&PID_100A\00CC848C41"));
+        const string root=@"USB\VID_3537&PID_1004\receiver";
+        True(!ReceiverPresence.IsSessionRoot(root));
+        True(!ReceiverPresence.HasGipCompatibleId([@"USB\Class_FF&SubClass_5D&Prot_01",@"USB\MS_COMP_XGIP100"]));
+        bool verifiedGip=ReceiverPresence.HasGipCompatibleId([@"usb\ms_comp_xgip10"]);
+        True(ReceiverPresence.IsSessionRoot(root,verifiedGip));
+        True(!ReceiverPresence.IsSessionRoot(@"USB\VID_3537&PID_1004&MI_00\receiver",verifiedGip));
     }),
     ("A present controller that Windows does not report within ten seconds counts as a failed session",()=>{
         var gate=new ConnectionGate();
@@ -346,6 +352,9 @@ var tests = new (string Name, Action Body)[] {
     ("Only the selected GameSir GIP model can receive a hide rule",()=>{
         True(PhysicalHidePolicy.IsSelectedModel(@"USB\VID_3537&PID_106B&MI_00\example"));
         True(PhysicalHidePolicy.IsSelectedModel(@"hid\vid_3537&pid_106b&ig_00\example"));
+        True(PhysicalHidePolicy.IsSelectedModel(@"USB\VID_3537&PID_1004\receiver"));
+        True(!PhysicalHidePolicy.IsSelectedModel(@"USB\VID_3537&PID_1004&MI_00\receiver"));
+        True(!PhysicalHidePolicy.IsSelectedModel(@"HID\VID_3537&PID_1004\receiver"));
         foreach(var id in new[]{@"USB\VID_054C&PID_0CE6\example",@"USB\VID_28DE&PID_1302\example",@"USB\VID_3537&PID_100A\example",@"USB\VID_3537&PID_106B9\example","USB\\VID_3537&PID_106B\\bad\n"})True(!PhysicalHidePolicy.IsSelectedModel(id));
     }),
     ("Activating HidHide cannot activate disabled rules for unrelated devices",()=>{
@@ -416,10 +425,14 @@ var tests = new (string Name, Action Body)[] {
         Equal<UsbDeviceIdentity?>(target,G7SessionSetup.FindTransitionTarget("7:4",[target,new("7:5",0x3537,0x109C)]));
         True(G7SessionSetup.FindTransitionTarget("7:5",[target]) is null);
     }),
-    ("Observed 106B identity can be enumerated and starts session heartbeats", () => {
+    ("106B and verified 1004 identities can be enumerated and start session heartbeats", () => {
         True(G7DeviceCatalog.IsSupported(0x3537,0x106B));True(G7DeviceCatalog.IsSessionIdentity(0x3537,0x106B));
         True(!G7DeviceCatalog.IsSessionIdentity(0x3537,0x100A));
         True(!G7DeviceCatalog.IsSupported(0x1234,0x106B));True(!G7DeviceCatalog.IsSupported(0x3537,0x1004));
+        True(G7DeviceCatalog.IsSupported(0x3537,0x1004,verifiedGip:true));
+        True(G7DeviceCatalog.IsSessionIdentity(0x3537,0x1004,verifiedGip:true));
+        True(!G7DeviceCatalog.IsSessionIdentity(0x3537,0x1004));
+        True(!G7DeviceCatalog.IsSupported(0x1234,0x1004,verifiedGip:true));
     }),
     ("Observed 106B controller interface is accepted while its audio interface is rejected", () => {
         True(UsbInterfacePolicy.SupportsG7(new(0,0,0xFF,0x47,0xD0,[new(0x02,3,64,4),new(0x82,3,64,2)])));

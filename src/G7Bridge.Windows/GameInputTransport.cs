@@ -45,11 +45,13 @@ internal sealed class GameInputTransport : IControllerTransport
     public string PhysicalKey { get; }
     public string InstanceId { get; }
 
+    // The native adapter only issues a GIP key for a verified USB root.
+    internal static bool IsDirectGip(string key)=>key.StartsWith("GIP:",StringComparison.Ordinal);
     public static IReadOnlyList<ControllerDevice> Enumerate()
     {
         var items=new NativeInfo[16];Check(g7_enumerate(items,16,out uint count),"GameInput-apparaten zoeken",runtimeOperation:true);
-        return items.Take((int)count).Where(d=>G7DeviceCatalog.IsSupported(d.Vendor,d.Product)).Select(d=>
-            new ControllerDevice(d.Id,$"GameSir {d.Vendor:X4}:{d.Product:X4} — {(d.Id.StartsWith("GIP:",StringComparison.Ordinal)?"direct GIP input":"Windows GameInput")}",d.Product,"GameInput",d.Key)).ToArray();
+        return items.Take((int)count).Where(d=>G7DeviceCatalog.IsSupported(d.Vendor,d.Product,IsDirectGip(d.Id))).Select(d=>
+            new ControllerDevice(d.Id,$"GameSir {d.Vendor:X4}:{d.Product:X4} — {(IsDirectGip(d.Id)?"direct GIP input":"Windows GameInput")}",d.Product,"GameInput",d.Key)).ToArray();
     }
     public GameInputTransport(ControllerDevice device,Action<string> logger)
     {
@@ -60,7 +62,8 @@ internal sealed class GameInputTransport : IControllerTransport
         PhysicalKey=info.Key;
         var instance=new StringBuilder(1024);
         InstanceId=g7_device_instance(handle,instance,1024)>=0?instance.ToString():"";
-        if(info.Product!=device.ProductId || !G7DeviceCatalog.IsSupported(info.Vendor,info.Product) ||
+        bool directGip=IsDirectGip(info.Id);
+        if(info.Product!=device.ProductId || !G7DeviceCatalog.IsSupported(info.Vendor,info.Product,directGip) ||
             (!string.IsNullOrWhiteSpace(device.PhysicalKey) && info.Key!=device.PhysicalKey)) {
             Dispose();throw new IOException("The selected GameInput device has changed. Reconnect the controller.");
         }
@@ -68,10 +71,10 @@ internal sealed class GameInputTransport : IControllerTransport
         log("Background input for controller, Guide and Share requested. The Microsoft Xbox driver remains active.");
         log("GameInput reports: "+info.Reports);
         log("Physical USB location: "+(string.IsNullOrWhiteSpace(PhysicalKey)?"unknown — automatic mode switch refused":PhysicalKey));
-        log(device.Key.StartsWith("GIP:",StringComparison.Ordinal)?
+        log(directGip?
             "Windows GIP: axes from GamepadReading and original pad reports; physical buttons and gyro from device telemetry.":
             "Diagnostics: GIP headers and ordinary pad frames are reconstructed from GameInput; only raw payload is unmodified device input.");
-        if(G7DeviceCatalog.IsSessionIdentity(info.Vendor,info.Product)) {
+        if(G7DeviceCatalog.IsSessionIdentity(info.Vendor,info.Product,directGip)) {
             int prepared=g7_prepare_vendor(handle);
             log($"Preparing additional GameSir channel: 0x{prepared:X8}."+(prepared<0?" Ordinary input remains available.":""));
             LogVendorStatus();

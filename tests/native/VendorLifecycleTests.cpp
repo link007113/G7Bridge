@@ -19,6 +19,13 @@ struct FakeProvider : winrt::implements<FakeProvider,C::IGameControllerProvider,
     winrt::Windows::Foundation::IAsyncOperationWithProgress<C::GipFirmwareUpdateResult,C::GipFirmwareUpdateProgress>
         UpdateFirmwareAsync(winrt::Windows::Storage::Streams::IInputStream const&) {throw winrt::hresult_not_implemented();}
 };
+struct FakeXInputProvider : winrt::implements<FakeXInputProvider,C::IGameControllerProvider> {
+    C::GameControllerVersionInfo FirmwareVersionInfo() const {return {};}
+    C::GameControllerVersionInfo HardwareVersionInfo() const {return {};}
+    uint16_t HardwareVendorId() const {return 0x3537;}
+    uint16_t HardwareProductId() const {return G7Native::XboxModeProduct;}
+    bool IsConnected() const {return true;}
+};
 std::array<uint8_t,60> CapturedPayload() {
     // Actual L4 payload from capture 2, frame 8241 (GIP header excluded).
     constexpr char hex[]="e0808080800f0000000000000004ff520079ff7bfc520c52dd00000000470000ffff00ffff00ffff00ffff00000000838185850f0008000000000000";
@@ -109,6 +116,15 @@ int main() {
     }
     auto other=winrt::make_self<FakeProvider>();other->vendor=0x045E;
     check(!factory->CreateGameController(other.as<C::IGameControllerProvider>()),"Other manufacturers never receive a G7 sink");
+    check(G7Native::HasGipCompatibleId(L"USB\\Class_FF&SubClass_47&Prot_D0\0usb\\ms_comp_xgip10\0") &&
+        !G7Native::HasGipCompatibleId(L"USB\\Class_FF&SubClass_5D&Prot_01\0USB\\MS_COMP_XGIP100\0"),
+        "The 1004 root requires an exact GIP compatible ID");
+    auto xinput=winrt::make_self<FakeXInputProvider>();
+    check(!factory->CreateGameController(xinput.as<C::IGameControllerProvider>()) && SUCCEEDED(factory->LastError()),
+        "An unrelated 1004 XInput provider is ignored without affecting GIP binding");
+    auto xboxMode=winrt::make_self<FakeProvider>();xboxMode->product=G7Native::XboxModeProduct;
+    check(static_cast<bool>(factory->CreateGameController(xboxMode.as<C::IGameControllerProvider>())),
+        "The production factory constructs a sink for the 1004 GIP provider");
     auto removedFactory=winrt::make_self<G7Native::Factory>();
     auto firstProvider=winrt::make_self<FakeProvider>(),secondProvider=winrt::make_self<FakeProvider>();
     auto first=Aggregate(removedFactory->CreateGameController(firstProvider.as<C::IGameControllerProvider>()));
